@@ -1,0 +1,13 @@
+# المجلدات التي اكتشفناها
+data/
+datasets/
+indexes/
+models/
+output/
+
+# تجاهل ملفات البايثون المترجمة والبيئة الافتراضية
+__pycache__/
+*.pyc
+venv/
+.venv/
+.env/

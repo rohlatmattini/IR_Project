@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام استرجاع المعلومات</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232736;
+    --border: #2e3347;
+    --accent: #6c8fff;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans Arabic', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* Header */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  header h1 { font-size: 1.3rem; font-weight: 600; color: var(--accent); }
+  header span { color: var(--muted); font-size: 0.85rem; }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: calc(100vh - 60px);
+  }
+
+  /* Sidebar */
+  aside {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  select, input[type="number"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+
+  .bm25-controls { display: none; }
+  .bm25-controls.visible { display: block; }
+
+  .param-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .param-row label { font-size: 0.85rem; color: var(--muted); }
+  .param-row input { width: 80px; }
+
+  /* Main */
+  main { padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
+
+  /* Search box */
+  .search-box {
+    display: flex;
+    gap: 0.75rem;
+  }
+  .search-box input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border-radius: 10px;
+  }
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #5a7aff; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+  }
+  .tab {
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px 8px 0 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+    background: var(--surface2);
+  }
+
+  /* Results */
+  .meta-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .refinement-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-right: 3px solid var(--accent2);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+  }
+  .refinement-box strong { color: var(--accent2); }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+  .result-card:hover { border-color: var(--accent); }
+
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+  }
+  .result-rank {
+    font-size: 0.75rem;
+    background: var(--surface2);
+    color: var(--accent);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .result-score {
+    font-size: 0.8rem;
+    color: var(--green);
+    font-weight: 600;
+  }
+  .result-title {
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+    color: var(--text);
+  }
+  .result-snippet {
+    font-size: 0.88rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .result-id {
+    font-size: 0.75rem;
+    color: var(--border);
+    margin-top: 0.4rem;
+  }
+
+  /* Evaluation */
+  .eval-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .metric-name {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.25rem;
+  }
+
+  /* Loading */
+  .loading {
+    display: none;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--muted);
+    padding: 2rem;
+    justify-content: center;
+  }
+  .loading.visible { display: flex; }
+  .spinner {
+    width: 24px; height: 24px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--muted);
+  }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+  .error-msg {
+    background: rgba(248, 113, 113, 0.1);
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    color: var(--red);
+    font-size: 0.9rem;
+  }
+
+  /* History */
+  .history-chip {
+    display: inline-block;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin: 0.25rem;
+    transition: all 0.2s;
+  }
+  .history-chip:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔍 نظام استرجاع المعلومات</h1>
+  <span>Information Retrieval System — IR Project 2026</span>
+</header>
+
+<div class="layout">
+
+  <!-- Sidebar Settings -->
+  <aside>
+    <div>
+      <div class="section-title">مجموعة البيانات</div>
+      <select id="datasetSelect">
+        <option value="dataset2">Webis Touché 2020</option>
+      </select>
+    </div>
+
+    <div>
+      <div class="section-title">نموذج التمثيل</div>
+      <select id="modelSelect" onchange="onModelChange()">
+        <option value="tfidf">VSM — TF-IDF</option>
+        <option value="bm25" selected>BM25 (احتمالي)</option>
+        <option value="embedding">Embedding (SBERT)</option>
+        <option value="hybrid_parallel">Hybrid — متوازي (Parallel)</option>
+        <option value="hybrid_serial">Hybrid — تسلسلي (Serial)</option>
+      </select>
+    </div>
+
+    <!-- BM25 Controls -->
+    <div class="bm25-controls" id="bm25Controls">
+      <div class="section-title">معاملات BM25</div>
+      <div class="param-row">
+        <label>k1 (تكرار المصطلح)</label>
+        <input type="number" id="bm25k1" value="1.5" min="0.1" max="3" step="0.1">
+      </div>
+      <div class="param-row">
+        <label>b (تطبيع الطول)</label>
+        <input type="number" id="bm25b" value="0.75" min="0" max="1" step="0.05">
+      </div>
+      <small style="color:var(--muted);font-size:0.8rem">
+        k1 ∈ [1.2, 2.0] | b ∈ [0, 1]
+      </small>
+    </div>
+
+    <!-- Hybrid Controls -->
+    <div id="hybridControls" style="display:none">
+      <div class="section-title">طريقة الدمج (Fusion)</div>
+      <select id="fusionMethod">
+        <option value="rrf">RRF — Reciprocal Rank Fusion</option>
+        <option value="linear">Linear Combination</option>
+      </select>
+    </div>
+
+    <div>
+      <div class="section-title">خيارات البحث</div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="useRefinement">
+        تحسين الاستعلام (Query Refinement)
+      </label>
+    </div>
+
+    <div>
+      <div class="section-title">عدد النتائج</div>
+      <input type="number" id="topK" value="10" min="1" max="50">
+    </div>
+
+    <button class="btn btn-outline" onclick="openEvalPanel()">📊 تقييم النظام</button>
+  </aside>
+
+  <!-- Main Content -->
+  <main>
+    <div class="search-box">
+      <input type="text" id="queryInput" placeholder="اكتب استعلامك هنا... مثال: machine learning algorithms"
+             onkeydown="if(event.key==='Enter') doSearch()">
+      <button class="btn btn-primary" id="searchBtn" onclick="doSearch()">بحث</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('results')">النتائج</button>
+      <button class="tab" onclick="switchTab('eval')">التقييم</button>
+      <button class="tab" onclick="switchTab('history')">سجل البحث</button>
+      <button class="tab" onclick="switchTab('rag')">🤖 RAG</button>
+    </div>
+
+    <!-- Results Tab -->
+    <div id="tab-results">
+      <div class="loading" id="loadingSpinner">
+        <div class="spinner"></div>
+        <span>جارٍ البحث...</span>
+      </div>
+
+      <div id="errorMsg" class="error-msg" style="display:none"></div>
+      <div id="refinementInfo" class="refinement-box" style="display:none"></div>
+      <div id="metaBar" class="meta-bar" style="display:none"></div>
+      <div id="resultsList"></div>
+
+      <div class="empty-state" id="emptyState">
+        <div class="icon">🔎</div>
+        <p>ابدأ بكتابة استعلامك واضغط بحث</p>
+      </div>
+    </div>
+
+    <!-- Evaluation Tab -->
+    <div id="tab-eval" style="display:none">
+      <div style="margin-bottom:1rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="runEvaluation(false)">تقييم بدون Refinement</button>
+        <button class="btn btn-primary" onclick="runEvaluation(true)">تقييم مع Refinement</button>
+        <button class="btn btn-outline" onclick="runEvalAll()">تقييم كل النماذج</button>
+      </div>
+      <div id="evalLoading" class="loading"><div class="spinner"></div><span>جارٍ التقييم (قد يأخذ دقيقة)...</span></div>
+      <div id="evalResults"></div>
+    </div>
+
+    <!-- History Tab -->
+    <div id="tab-history" style="display:none">
+      <div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--muted)">استعلاماتك السابقة</span>
+        <button class="btn btn-outline" onclick="clearHistory()">مسح السجل</button>
+      </div>
+      <div id="historyList"></div>
+    </div>
+
+    <!-- RAG Tab -->
+<div id="tab-rag" style="display:none">
+  <div style="margin-bottom:1rem">
+    <p style="color:var(--muted);margin-bottom:0.75rem;font-size:0.9rem">
+      اكتب استعلامك وسيقوم النظام باسترجاع الوثائق وتوليد إجابة مباشرة بالذكاء الاصطناعي
+    </p>
+    <div class="search-box">
+      <input type="text" id="ragInput" placeholder="اسأل سؤالاً مباشراً...">
+      <button class="btn btn-primary" onclick="doRAG()">🤖 Generate Answer</button>
+    </div>
+  </div>
+  <div id="ragLoading" class="loading"><div class="spinner"></div><span>جارٍ التوليد...</span></div>
+  <div id="ragAnswer" style="display:none">
+    <div style="background:var(--surface2);border:1px solid var(--accent);border-radius:10px;padding:1.25rem;margin-bottom:1rem">
+      <div style="color:var(--accent);font-weight:600;margin-bottom:0.5rem">🤖 الإجابة المولّدة</div>
+      <div id="ragAnswerText" style="line-height:1.8;white-space:pre-wrap"></div>
+    </div>
+    <div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">📄 الوثائق المستخدمة كمصادر:</div>
+    <div id="ragSources"></div>
+  </div>
+</div>
+
+  </main>
+</div>
+
+
+
+<script>
+async function doRAG() {
+  const query = document.getElementById('ragInput').value.trim();
+  if (!query) return;
+
+  document.getElementById('ragLoading').classList.add('visible');
+  document.getElementById('ragAnswer').style.display = 'none';
+
+  try {
+    const res = await fetch('/api/rag', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        query,
+        dataset: document.getElementById('datasetSelect').value,
+        model: document.getElementById('modelSelect').value,
+      })
+    });
+    const data = await res.json();
+
+    document.getElementById('ragAnswerText').textContent = data.rag_answer || 'لم يتم توليد إجابة';
+    document.getElementById('ragSources').innerHTML = (data.retrieved_docs || []).map((d,i) =>
+      `<div class="result-card" style="margin-bottom:0.5rem">
+        <span class="result-rank">#${i+1}</span>
+        <span style="margin-right:0.5rem;font-weight:600">${d.title || d.doc_id}</span>
+        <div class="result-snippet">${d.snippet}</div>
+      </div>`
+    ).join('');
+
+    document.getElementById('ragAnswer').style.display = 'block';
+  } catch(e) {
+    document.getElementById('ragAnswerText').textContent = 'خطأ: ' + e.message;
+    document.getElementById('ragAnswer').style.display = 'block';
+  } finally {
+    document.getElementById('ragLoading').classList.remove('visible');
+  }
+}
+</script>
+
+<script>
+
+
+  const API = '/api';
+
+function onModelChange() {
+  const model = document.getElementById('modelSelect').value;
+  document.getElementById('bm25Controls').className =
+    'bm25-controls' + (model === 'bm25' ? ' visible' : '');
+  document.getElementById('hybridControls').style.display =
+    model === 'hybrid_parallel' ? 'block' : 'none';
+}
+onModelChange();
+
+function switchTab(name) {
+  ['results','eval','history','rag'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach((tab, i) => {
+    tab.classList.toggle('active', ['results','eval','history','rag'][i] === name);
+  });
+  if (name === 'history') loadHistory();
+}
+
+async function doSearch() {
+  const query = document.getElementById('queryInput').value.trim();
+  if (!query) return;
+
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true;
+  document.getElementById('loadingSpinner').classList.add('visible');
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('errorMsg').style.display = 'none';
+  document.getElementById('refinementInfo').style.display = 'none';
+  document.getElementById('metaBar').style.display = 'none';
+  document.getElementById('resultsList').innerHTML = '';
+
+  const model = document.getElementById('modelSelect').value;
+  const body = {
+    query,
+    dataset: document.getElementById('datasetSelect').value,
+    model,
+    top_k: parseInt(document.getElementById('topK').value),
+    use_refinement: document.getElementById('useRefinement').checked,
+  };
+
+  if (model === 'bm25') {
+    body.bm25_k1 = parseFloat(document.getElementById('bm25k1').value);
+    body.bm25_b  = parseFloat(document.getElementById('bm25b').value);
+  }
+  if (model === 'hybrid_parallel') {
+    body.fusion_method = document.getElementById('fusionMethod').value;
+  }
+
+  try {
+    const res = await fetch(`${API}/search`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    // عرض معلومات التحسين
+    if (data.refinement_info) {
+      const ri = data.refinement_info;
+      const corrections = ri.corrections?.join(' | ') || '';
+      const synonyms = ri.synonyms_added?.slice(0, 5).join('، ') || '';
+      document.getElementById('refinementInfo').style.display = 'block';
+      document.getElementById('refinementInfo').innerHTML =
+        `<strong>🔧 تم تحسين الاستعلام:</strong> "${data.refined_query}"` +
+        (corrections ? `<br>تصحيحات: ${corrections}` : '') +
+        (synonyms ? `<br>مرادفات مضافة: ${synonyms}` : '');
+    }
+
+    // Meta bar
+    document.getElementById('metaBar').style.display = 'flex';
+    document.getElementById('metaBar').innerHTML =
+      `<span>${data.total_results} نتيجة</span>
+       <span>النموذج: <b style="color:var(--accent)">${model.toUpperCase()}</b> | 
+             البيانات: <b style="color:var(--accent2)">${body.dataset}</b></span>`;
+
+    // النتائج
+    const list = document.getElementById('resultsList');
+    if (!data.results || data.results.length === 0) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">😶</div><p>لا توجد نتائج</p></div>';
+    } else {
+      list.innerHTML = data.results.map(r => `
+        <div class="result-card" style="margin-bottom:0.75rem">
+          <div class="result-header">
+            <span class="result-rank">#${r.rank}</span>
+            <span class="result-score">Score: ${r.score}</span>
+          </div>
+          <div class="result-title">${r.title || r.doc_id}</div>
+          <div class="result-snippet">${r.snippet}</div>
+          <div class="result-id">ID: ${r.doc_id}</div>
+        </div>
+      `).join('');
+    }
+
+  } catch (err) {
+    document.getElementById('errorMsg').style.display = 'block';
+    document.getElementById('errorMsg').textContent = '❌ خطأ: ' + err.message + ' — تأكد أن السيرفر شغّال على port 5000';
+  } finally {
+    btn.disabled = false;
+    document.getElementById('loadingSpinner').classList.remove('visible');
+  }
+}
+
+async function runEvaluation(useRefinement) {
+  const loading = document.getElementById('evalLoading');
+  loading.classList.add('visible');
+  document.getElementById('evalResults').innerHTML = '';
+
+  const model = document.getElementById('modelSelect').value;
+  const dataset = document.getElementById('datasetSelect').value;
+
+  try {
+    const res = await fetch(`${API}/evaluate`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ dataset, model, max_queries: 50, use_refinement: useRefinement })
+    });
+    const data = await res.json();
+    showEvalResults(data, useRefinement);
+  } catch (err) {
+    document.getElementById('evalResults').innerHTML = '<div class="error-msg">خطأ في التقييم: ' + err.message + '</div>';
+  } finally {
+    loading.classList.remove('visible');
+  }
+}
+
+function showEvalResults(data, refined) {
+  const label = refined ? 'بعد Refinement' : 'بدون Refinement';
+  document.getElementById('evalResults').innerHTML = `
+    <h3 style="margin-bottom:1rem;color:var(--muted);font-size:0.9rem">${label} — ${data.dataset} — ${data.num_queries_evaluated} استعلام</h3>
+    <div class="eval-grid">
+      <div class="metric-card"><div class="metric-value">${data.MAP}</div><div class="metric-name">MAP</div></div>
+      <div class="metric-card"><div class="metric-value">${data.Recall}</div><div class="metric-name">Recall</div></div>
+      <div class="metric-card"><div class="metric-value">${data['P@10']}</div><div class="metric-name">Precision@10</div></div>
+      <div class="metric-card"><div class="metric-value">${data['nDCG@10']}</div><div class="metric-name">nDCG@10</div></div>
+    </div>
+  `;
+}
+
+async function runEvalAll() {
+  const loading = document.getElementById('evalLoading');
+  loading.classList.add('visible');
+  document.getElementById('evalResults').innerHTML = '';
+  try {
+    const res = await fetch(`${API}/evaluate/all`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ dataset: document.getElementById('datasetSelect').value })
+    });
+    const data = await res.json();
+    let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.9rem">';
+    html += '<tr style="color:var(--muted)"><th style="padding:0.5rem;text-align:right">النموذج</th><th>MAP</th><th>Recall</th><th>P@10</th><th>nDCG@10</th></tr>';
+    for (const [model, vals] of Object.entries(data)) {
+      const b = vals.before_refinement;
+      const a = vals.after_refinement;
+      html += `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:0.5rem;color:var(--accent)">${model}</td>
+        <td style="padding:0.5rem;text-align:center">${b.MAP} → <b style="color:var(--green)">${a.MAP}</b></td>
+        <td style="padding:0.5rem;text-align:center">${b.Recall} → <b style="color:var(--green)">${a.Recall}</b></td>
+        <td style="padding:0.5rem;text-align:center">${b['P@10']} → <b style="color:var(--green)">${a['P@10']}</b></td>
+        <td style="padding:0.5rem;text-align:center">${b['nDCG@10']} → <b style="color:var(--green)">${a['nDCG@10']}</b></td>
+      </tr>`;
+    }
+    html += '</table></div>';
+    document.getElementById('evalResults').innerHTML = html;
+  } catch(e) {
+    document.getElementById('evalResults').innerHTML = '<div class="error-msg">' + e.message + '</div>';
+  } finally {
+    loading.classList.remove('visible');
+  }
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch(`${API}/history`);
+    const data = await res.json();
+    const el = document.getElementById('historyList');
+    if (!data.history?.length) {
+      el.innerHTML = '<p style="color:var(--muted)">لا يوجد سجل بعد</p>';
+    } else {
+      el.innerHTML = [...data.history].reverse().map(q =>
+        `<span class="history-chip" onclick="document.getElementById('queryInput').value='${q.replace(/'/g, "\\'")}'">${q}</span>`
+      ).join('');
+    }
+  } catch(e) {}
+}
+
+async function clearHistory() {
+  await fetch(`${API}/history`, { method: 'DELETE' });
+  loadHistory();
+}
+
+function openEvalPanel() { switchTab('eval'); }
+</script>
+</body>
+</html>
