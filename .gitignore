@@ -6,7 +6,7 @@ models/
 output/
 
 # تجاهل ملفات البايثون المترجمة والبيئة الافتراضية
-__pycache__/
+pycache/
 *.pyc
 venv/
 .venv/

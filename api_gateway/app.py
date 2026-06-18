@@ -1,11 +1,7 @@
-"""
-API Gateway - Flask
-نقطة الدخول الوحيدة لكل الخدمات
-"""
-
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sys, os
+import json
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 import config
@@ -13,30 +9,6 @@ import config
 app = Flask(__name__)
 CORS(app)
 
-# Cache للنماذج بدون ما نعيد التحميل كل مرة
-_models_cache = {}
-
-
-def get_model(dataset_key: str, model_type: str):
-    cache_key = f"{dataset_key}_{model_type}"
-    if cache_key not in _models_cache:
-        print(f"[API] Loading {model_type} for {dataset_key}...")
-        if model_type == "tfidf":
-            from services.retrieval_service.tfidf_model import get_tfidf_model
-            _models_cache[cache_key] = get_tfidf_model(dataset_key)
-        elif model_type == "bm25":
-            from services.retrieval_service.bm25_model import get_bm25_model
-            _models_cache[cache_key] = get_bm25_model(dataset_key)
-        elif model_type == "embedding":
-            from services.retrieval_service.embedding_model import get_embedding_model
-            _models_cache[cache_key] = get_embedding_model(dataset_key)
-        elif model_type in ("hybrid_parallel", "hybrid_serial"):
-            from services.retrieval_service.hybrid_model import get_hybrid_model
-            _models_cache[cache_key] = get_hybrid_model(dataset_key)
-    return _models_cache[cache_key]
-
-
-import json
 
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), "search_history.json")
 
@@ -58,18 +30,16 @@ def _save_history(history):
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, ensure_ascii=False)
 
+
 def _normalize_for_history(query: str) -> str:
-    """توحيد الاستعلام للمقارنة فقط (بدون التأثير على الشكل المحفوظ)"""
     return query.strip().lower()
 
 
 def _append_history(query: str):
-    """يحفظ الاستعلام بدون أي تكرار، حتى لو غير متتالي،
-    وينقل الاستعلام المكرر ليصبح آخر عنصر (الأحدث)"""
+    """يحفظ الاستعلام بدون أي تكرار"""
     query = query.strip()
     if not query:
         return
-
     norm = _normalize_for_history(query)
     _search_history[:] = [
         q for q in _search_history if _normalize_for_history(q) != norm
@@ -78,9 +48,7 @@ def _append_history(query: str):
     _save_history(_search_history)
 
 
-_search_history = _load_history()# ============================================
-# Endpoints
-# ============================================
+_search_history = _load_history()
 
 
 @app.route("/")
@@ -93,7 +61,7 @@ def index():
 def search():
     data = request.json
     query = data.get("query", "").strip()
-    dataset = data.get("dataset", "dataset1")
+    dataset = data.get("dataset", "dataset2")
     model_type = data.get("model", "bm25")
     top_k = int(data.get("top_k", config.RETRIEVAL["top_k_display"]))
     use_refine = data.get("use_refinement", False)
@@ -109,54 +77,59 @@ def search():
         search_query = refined["refined_query"]
         refinement_info = refined
 
-    # حفظ الاستعلام بدون تكرار
     _append_history(query)
 
-    model = get_model(dataset, model_type)
+    try:
+        from services.search_service.searcher import SearchService
 
-    if model_type == "tfidf":
-        raw_results = model.search(search_query, top_k=top_k * 5)
-    elif model_type == "bm25":
-        k1 = float(data.get("bm25_k1", config.BM25_PARAMS["k1"]))
-        b = float(data.get("bm25_b", config.BM25_PARAMS["b"]))
-        raw_results = model.search(search_query, top_k=top_k * 5, k1=k1, b=b)
-    elif model_type == "embedding":
-        raw_results = model.search(search_query, top_k=top_k * 5)
-    elif model_type == "hybrid_parallel":
-        fusion = data.get("fusion_method", config.HYBRID["fusion_method"])
-        raw_results = model.search_parallel(
-            search_query, top_k=top_k * 5, fusion_method=fusion
+        extra_params = {}
+        if model_type == "bm25":
+            extra_params["bm25_k1"] = float(data.get("bm25_k1", config.BM25_PARAMS["k1"]))
+            extra_params["bm25_b"] = float(data.get("bm25_b", config.BM25_PARAMS["b"]))
+        elif model_type == "hybrid_parallel":
+            extra_params["fusion_method"] = data.get(
+                "fusion_method", config.HYBRID["fusion_method"]
+            )
+
+        result = SearchService.search_and_rank(
+            query=search_query,
+            dataset_key=dataset,
+            model_type=model_type,
+            top_k_display=top_k,
+            **extra_params,
         )
-    elif model_type == "hybrid_serial":
-        raw_results = model.search_serial(search_query, top_k=top_k * 5)
-    else:
-        return jsonify({"error": f"Unknown model type: {model_type}"}), 400
 
-    from services.ranking_service.ranker import rank_and_enrich
-    ranked = rank_and_enrich(raw_results, dataset, top_k=top_k, query=search_query)
+        result["refined_query"] = search_query if use_refine else None
+        result["refinement_info"] = refinement_info
+        result["query"] = query
 
-    return jsonify(
-        {
-            "query": query,
-            "refined_query": search_query if use_refine else None,
-            "refinement_info": refinement_info,
-            "dataset": dataset,
-            "model": model_type,
-            "total_results": len(ranked),
-            "results": ranked,
-        }
-    )
+        return jsonify(result)
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Search failed: {str(e)}"}), 500
 
 
 @app.route("/api/evaluate", methods=["POST"])
 def evaluate():
+    """تقييم نموذج واحد على كل qrels queries"""
     data = request.json
-    dataset = data.get("dataset", "dataset1")
-    model_type = data.get("model", "tfidf")
-    max_q = int(data.get("max_queries", 50))
+    dataset = data.get("dataset", "dataset2")
+    model_type = data.get("model", "bm25")
+    max_q = data.get("max_queries", None)
+    if max_q is not None:
+        try:
+            max_q = int(max_q)
+            if max_q <= 0:
+                max_q = None
+        except (ValueError, TypeError):
+            max_q = None
     use_refine = data.get("use_refinement", False)
+    force_recompute = data.get("force_recompute", False)
 
-    model = get_model(dataset, model_type)
+    from services.search_service.searcher import SearchService
+    model = SearchService._get_model(dataset, model_type)
 
     if model_type == "hybrid_parallel":
         search_fn = model.search_parallel
@@ -167,34 +140,80 @@ def evaluate():
 
     from services.evaluation_service.evaluator import evaluate_model
     results = evaluate_model(
-        search_fn, dataset, use_refinement=use_refine, max_queries=max_q
+        search_fn,
+        dataset,
+        use_refinement=use_refine,
+        max_queries=max_q,
+        model_name=model_type,
+        use_cache=not force_recompute,
     )
     return jsonify(results)
 
 
 @app.route("/api/evaluate/all", methods=["POST"])
 def evaluate_all():
+    """تقييم كل النماذج على كل qrels queries"""
     data = request.json
-    dataset = data.get("dataset", "dataset1")
+    dataset = data.get("dataset", "dataset2")
+    max_queries = data.get("max_queries", None)
+    if max_queries is not None:
+        try:
+            max_queries = int(max_queries)
+            if max_queries <= 0:
+                max_queries = None
+        except (ValueError, TypeError):
+            max_queries = None
+    force_recompute = data.get("force_recompute", False)
     from services.evaluation_service.evaluator import evaluate_all_models
-    results = evaluate_all_models(dataset)
+    results = evaluate_all_models(
+        dataset, max_queries=max_queries, use_cache=not force_recompute
+    )
     return jsonify(results)
+
+
+@app.route("/api/evaluate/cache", methods=["DELETE"])
+def clear_eval_cache():
+    """مسح cache التقييم"""
+    from services.evaluation_service.evaluator import clear_cache
+    count = clear_cache()
+    return jsonify({"message": f"Cleared {count} cached results"})
 
 
 @app.route("/api/datasets", methods=["GET"])
 def get_datasets():
+    from services.search_service.searcher import SearchService
     return jsonify(
         {
             "datasets": [
                 {"key": "dataset2", "name": config.DATASET_NAMES["dataset2"]},
             ],
-            "models": config.MODELS_LIST,
+            "models": SearchService.get_supported_models(),
         }
     )
+
 
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "message": "IR System is running"})
+
+
+# ضيف هاد الكود بعد route /api/health مباشرة
+
+@app.route("/api/multilingual/translate", methods=["POST"])
+def multilingual_translate():
+    """endpoint مستقل لتجربة Multilingual لحالها فقط"""
+    data = request.json
+    text = data.get("text", "").strip()
+
+    if not text:
+        return jsonify({"error": "Text is empty"}), 400
+
+    try:
+        from services.query_refinement_service.refiner import detect_and_translate
+        result = detect_and_translate(text)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Translation failed: {str(e)}"}), 500
 
 
 @app.route("/api/history", methods=["GET"])
@@ -211,33 +230,28 @@ def clear_history():
 
 @app.route("/api/rag", methods=["POST"])
 def rag_search():
-    """
-    RAG: بيعمل بحث عادي + يولّد إجابة بالـ LLM
-    """
     data = request.json
     query = data.get("query", "").strip()
-    dataset = data.get("dataset", "dataset1")
+    dataset = data.get("dataset", "dataset2")
     model_type = data.get("model", "bm25")
 
     if not query:
         return jsonify({"error": "Query is empty"}), 400
 
-    # خطوة 1: استرجاع الوثائق
-    model = get_model(dataset, model_type)
-    if model_type == "hybrid_parallel":
-        raw_results = model.search_parallel(query, top_k=10)
-    elif model_type == "hybrid_serial":
-        raw_results = model.search_serial(query, top_k=10)
-    else:
-        raw_results = model.search(query, top_k=10)
+    try:
+        from services.search_service.searcher import SearchService
+        search_result = SearchService.search_and_rank(
+            query=query,
+            dataset_key=dataset,
+            model_type=model_type,
+            top_k_display=5,
+        )
+        ranked = search_result["results"]
+    except Exception as e:
+        return jsonify({"error": f"Retrieval failed: {str(e)}"}), 500
 
-    from services.ranking_service.ranker import rank_and_enrich
-    ranked = rank_and_enrich(raw_results, dataset, top_k=5, query=query)
-
-    # حفظ الاستعلام بدون تكرار (RAG لا يحفظ إذا search حفظ نفس الاستعلام)
     _append_history(query)
 
-    # خطوة 2: توليد الإجابة
     from services.rag_service.rag import generate_answer
     rag_result = generate_answer(query, ranked)
 
@@ -253,7 +267,7 @@ def rag_search():
     )
 
 
-# ============================================
 if __name__ == "__main__":
     print("🚀 Running IR System API on http://localhost:5000")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    print("📊 Architecture: SOA with Search Service as Facade")
+    app.run(debug=False, host="0.0.0.0", port=5000)

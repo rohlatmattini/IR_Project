@@ -1,8 +1,4 @@
-"""
-Upload Raw Documents to MongoDB
-يرفع الوثائق الخام (raw text) إلى MongoDB بحيث يمكن قراءتها وقت الـ query بسرعة عبر doc_id
-يشتغل offline بعد التحضير، ومرة واحدة فقط (أو عند تغيير الداتا)
-"""
+
 
 import os
 import json
@@ -42,7 +38,6 @@ def upload_to_mongo(dataset_key: str, docs_path: str, batch_size: int = 1000):
     db = client[config.MONGO_DB_NAME]
     collection = db[config.MONGO_COLLECTIONS[dataset_key]]
 
-    # إنشاء index على doc_id لتسريع القراءة
     collection.create_index("doc_id", unique=True)
 
     print(f"[Mongo] تحميل الوثائق من {docs_path} ...")
@@ -70,4 +65,4 @@ def upload_to_mongo(dataset_key: str, docs_path: str, batch_size: int = 1000):
 
 if __name__ == "__main__":
     upload_to_mongo("dataset2", config.DATASET2_DOCS)
-    print("\n🎉 انتهى الرفع بنجاح!")
+    print("\n انتهى الرفع بنجاح!")

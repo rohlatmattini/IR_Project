@@ -389,6 +389,8 @@
       <button class="tab" onclick="switchTab('eval')">التقييم</button>
       <button class="tab" onclick="switchTab('history')">سجل البحث</button>
       <button class="tab" onclick="switchTab('rag')">🤖 RAG</button>
+        <button class="tab" onclick="switchTab('multilingual')">🌐 Multilingual</button>
+
     </div>
 
     <!-- Results Tab -->
@@ -450,6 +452,35 @@
     <div id="ragSources"></div>
   </div>
 </div>
+<!-- Multilingual Tab -->
+<div id="tab-multilingual" style="display:none">
+  <div style="margin-bottom:1rem">
+    <p style="color:var(--muted);margin-bottom:0.75rem;font-size:0.9rem">
+      اكتب نص بالعربي أو الإنجليزي ليكشف النظام اللغة ويترجمها تلقائياً (مستقل عن البحث وعن Query Refinement)
+    </p>
+    <div class="search-box">
+      <input type="text" id="mlInput" placeholder="اكتب استعلام بالعربي أو الإنجليزي...">
+      <button class="btn btn-primary" onclick="doMultilingual()">🌐 كشف وترجمة</button>
+    </div>
+  </div>
+  <div id="mlLoading" class="loading"><div class="spinner"></div><span>جارٍ الكشف والترجمة...</span></div>
+  <div id="mlResult" style="display:none">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1.25rem">
+      <div style="margin-bottom:0.75rem">
+        <span style="color:var(--muted);font-size:0.85rem">اللغة المكتشفة:</span>
+        <span id="mlLang" style="color:var(--accent);font-weight:600;margin-right:0.5rem"></span>
+      </div>
+      <div style="margin-bottom:0.5rem">
+        <span style="color:var(--muted);font-size:0.85rem">النص الأصلي:</span>
+        <div id="mlOriginal" style="margin-top:0.3rem"></div>
+      </div>
+      <div id="mlTranslatedBox" style="display:none;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border)">
+        <span style="color:var(--muted);font-size:0.85rem">الترجمة للإنجليزية:</span>
+        <div id="mlTranslated" style="margin-top:0.3rem;color:var(--green)"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
   </main>
 </div>
@@ -493,6 +524,43 @@ async function doRAG() {
     document.getElementById('ragLoading').classList.remove('visible');
   }
 }
+
+async function doMultilingual() {
+  const text = document.getElementById('mlInput').value.trim();
+  if (!text) return;
+
+  document.getElementById('mlLoading').classList.add('visible');
+  document.getElementById('mlResult').style.display = 'none';
+
+  try {
+    const res = await fetch('/api/multilingual/translate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('mlLang').textContent =
+      data.detected_language === 'ar' ? 'العربية (ar)' : 'English (en)';
+    document.getElementById('mlOriginal').textContent = data.original_text;
+
+    if (data.translation_applied) {
+      document.getElementById('mlTranslatedBox').style.display = 'block';
+      document.getElementById('mlTranslated').textContent = data.translated_text;
+    } else {
+      document.getElementById('mlTranslatedBox').style.display = 'none';
+    }
+
+    document.getElementById('mlResult').style.display = 'block';
+  } catch (e) {
+    document.getElementById('mlResult').style.display = 'block';
+    document.getElementById('mlOriginal').textContent = 'خطأ: ' + e.message;
+    document.getElementById('mlTranslatedBox').style.display = 'none';
+  } finally {
+    document.getElementById('mlLoading').classList.remove('visible');
+  }
+}
 </script>
 
 <script>
@@ -510,11 +578,12 @@ function onModelChange() {
 onModelChange();
 
 function switchTab(name) {
-  ['results','eval','history','rag'].forEach(t => {
+  const tabs = ['results','eval','history','rag','multilingual'];
+  tabs.forEach(t => {
     document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
   });
   document.querySelectorAll('.tab').forEach((tab, i) => {
-    tab.classList.toggle('active', ['results','eval','history','rag'][i] === name);
+    tab.classList.toggle('active', tabs[i] === name);
   });
   if (name === 'history') loadHistory();
 }
@@ -583,17 +652,30 @@ async function doSearch() {
     if (!data.results || data.results.length === 0) {
       list.innerHTML = '<div class="empty-state"><div class="icon">😶</div><p>لا توجد نتائج</p></div>';
     } else {
-      list.innerHTML = data.results.map(r => `
-        <div class="result-card" style="margin-bottom:0.75rem">
-          <div class="result-header">
-            <span class="result-rank">#${r.rank}</span>
-            <span class="result-score">Score: ${r.score}</span>
-          </div>
-          <div class="result-title">${r.title || r.doc_id}</div>
-          <div class="result-snippet">${r.snippet}</div>
-          <div class="result-id">ID: ${r.doc_id}</div>
-        </div>
-      `).join('');
+    list.innerHTML = data.results.map(r => `
+  <div class="result-card" style="margin-bottom:0.75rem">
+    <div class="result-header">
+      <span class="result-rank">#${r.rank}</span>
+      <span class="result-score">Score: ${r.score}</span>
+    </div>
+    <div class="result-title">${r.title || 'Document'}</div>
+    <div class="result-id" style="color:var(--accent);font-weight:600;margin-bottom:0.5rem">
+      📄 doc_id: <span style="color:var(--text);font-family:monospace">${r.doc_id}</span>
+    </div>
+    <details style="margin-top:0.5rem">
+      <summary style="cursor:pointer;color:var(--muted);font-size:0.85rem">
+        📖 عرض النص الأصلي الكامل (Original - No Preprocessing)
+      </summary>
+      <div style="background:var(--surface2);padding:0.75rem;border-radius:6px;margin-top:0.5rem;font-size:0.85rem;line-height:1.7;white-space:pre-wrap;max-height:400px;overflow-y:auto">
+        ${(r.full_text || r.snippet || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+      </div>
+    </details>
+    <div class="result-snippet" style="margin-top:0.5rem">
+      <strong style="color:var(--muted);font-size:0.8rem">المختصر:</strong>
+      ${r.snippet}
+    </div>
+  </div>
+`).join('');
     }
 
   } catch (err) {
@@ -604,7 +686,6 @@ async function doSearch() {
     document.getElementById('loadingSpinner').classList.remove('visible');
   }
 }
-
 async function runEvaluation(useRefinement) {
   const loading = document.getElementById('evalLoading');
   loading.classList.add('visible');
@@ -617,21 +698,28 @@ async function runEvaluation(useRefinement) {
     const res = await fetch(`${API}/evaluate`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ dataset, model, max_queries: 50, use_refinement: useRefinement })
+      // ⭐ ما عاد نرسل max_queries = كل الكويريات
+      body: JSON.stringify({ dataset, model, use_refinement: useRefinement })
     });
     const data = await res.json();
     showEvalResults(data, useRefinement);
   } catch (err) {
-    document.getElementById('evalResults').innerHTML = '<div class="error-msg">خطأ في التقييم: ' + err.message + '</div>';
+    document.getElementById('evalResults').innerHTML = '<div class="error-msg">خطأ: ' + err.message + '</div>';
   } finally {
     loading.classList.remove('visible');
   }
 }
-
 function showEvalResults(data, refined) {
   const label = refined ? 'بعد Refinement' : 'بدون Refinement';
   document.getElementById('evalResults').innerHTML = `
-    <h3 style="margin-bottom:1rem;color:var(--muted);font-size:0.9rem">${label} — ${data.dataset} — ${data.num_queries_evaluated} استعلام</h3>
+    <div style="background:var(--surface2);padding:1rem;border-radius:8px;margin-bottom:1rem;border-right:3px solid var(--accent)">
+      <div style="color:var(--accent);font-weight:600;margin-bottom:0.5rem">📊 ${label} — ${data.dataset}</div>
+      <div style="font-size:0.85rem;color:var(--muted);line-height:1.8">
+        ✅ تم تقييم: <b style="color:var(--green)">${data.num_queries_evaluated}</b> استعلام<br>
+        📋 عدد الـ queries في ملف qrels: <b>${data.num_queries_in_qrels}</b><br>
+        📄 عدد الـ queries في ملف queries: <b>${data.num_queries_in_file}</b>
+      </div>
+    </div>
     <div class="eval-grid">
       <div class="metric-card"><div class="metric-value">${data.MAP}</div><div class="metric-name">MAP</div></div>
       <div class="metric-card"><div class="metric-value">${data.Recall}</div><div class="metric-name">Recall</div></div>
@@ -640,6 +728,7 @@ function showEvalResults(data, refined) {
     </div>
   `;
 }
+
 
 async function runEvalAll() {
   const loading = document.getElementById('evalLoading');

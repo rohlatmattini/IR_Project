@@ -1,7 +1,3 @@
-"""
-TF-IDF / VSM Retrieval Model
-يمثل الوثائق والاستعلامات كمتجهات TF-IDF ويحسب التشابه بـ Cosine Similarity
-"""
 
 import os
 import json
@@ -20,19 +16,15 @@ import config
 class TFIDFModel:
     def __init__(self):
         self.vectorizer = TfidfVectorizer(
-            max_features=50000,  # أكبر 50000 مصطلح
-            sublinear_tf=True,  # log(TF) بدل TF العادي — بيحسّن النتائج
-            min_df=2,  # تجاهل المصطلحات اللي بتظهر بوثيقة وحدة بس
+            max_features=50000, 
+            sublinear_tf=True, 
+            min_df=2, 
         )
-        self.doc_matrix = None  # مصفوفة TF-IDF للوثائق (sparse)
-        self.doc_ids = []  # قائمة IDs بنفس ترتيب الصفوف
+        self.doc_matrix = None  
+        self.doc_ids = []  
         self.is_fitted = False
 
     def fit(self, documents: list):
-        """
-        documents: قائمة تحتوي على الوثائق الموحدة
-        يعالج النصوص ويبني مصفوفة TF-IDF
-        """
         if not documents:
             raise ValueError(
                 "[TF-IDF] ❌ Error: Document list is empty! Cannot fit the model."
@@ -51,29 +43,25 @@ class TFIDFModel:
         )
 
     def search(self, query: str, top_k: int = None) -> list:
-        """
-        يبحث عن الوثائق الأقرب للاستعلام
-        يرجع: قائمة من (doc_id, score) مرتبة تنازلياً
-        """
+        
         if not self.is_fitted or self.doc_matrix is None:
             raise RuntimeError("Model has not been fitted yet. Call fit() first.")
 
         top_k = top_k or config.RETRIEVAL["top_k"]
 
-        # معالجة الاستعلام بنفس طريقة الوثائق
+        # تأكد من أن هذه الأسطر تبدأ بـ 8 مسافات (مستوى واحد تحت تعريف الدالة)
         processed_query = preprocess_text(query)
         query_vec = self.vectorizer.transform([processed_query])
 
-        # حساب Cosine Similarity بين الاستعلام وكل الوثائق
         scores = cosine_similarity(query_vec, self.doc_matrix).flatten()
 
-        # ترتيب تنازلي وأخذ أعلى top_k
         top_indices = np.argsort(scores)[::-1][:top_k]
         results = [
             (self.doc_ids[i], float(scores[i])) for i in top_indices if scores[i] > 0
         ]
         return results
 
+        
     def save(self, path: str):
         if not self.is_fitted or self.doc_matrix is None:
             print("[TF-IDF] ⚠️ Warning: Save skipped because model is empty.")
@@ -101,22 +89,16 @@ class TFIDFModel:
 
 
 def load_documents_safely(docs_path: str) -> list:
-    """
-    تحميل الوثائق من ملف JSON بشكل مرن وآمن مهما كانت بنيته.
-    توحد المخرجات لتكون دائماً قائمة قواميس تحتوي على 'doc_id' و 'text'.
-    """
     with open(docs_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     normalized_list = []
 
-    # 1. إذا كانت البيانات قاموساً رئيساً (Dict)
     if isinstance(data, dict):
         sub_list = data.get("documents", data.get("data", data.get("docs")))
         if isinstance(sub_list, list):
             raw_docs = sub_list
         else:
-            # إذا كان الـ Dict يمثل المعرف كمفتاح والنص كقيمة
             for k, v in data.items():
                 if isinstance(v, dict):
                     doc_id = str(v.get("doc_id", k))
@@ -126,13 +108,11 @@ def load_documents_safely(docs_path: str) -> list:
                     normalized_list.append({"doc_id": str(k), "text": str(v)})
             return normalized_list
 
-    # 2. إذا كانت البيانات قائمة مباشرة (List)
     elif isinstance(data, list):
         raw_docs = data
     else:
         raise ValueError(f"Unexpected data format: {type(data)}")
 
-    # توحيد القائمة المستخرجة
     for i, doc in enumerate(raw_docs):
         if isinstance(doc, str):
             normalized_list.append({"doc_id": f"doc_{i}", "text": doc})
@@ -143,15 +123,13 @@ def load_documents_safely(docs_path: str) -> list:
 
     return normalized_list
 
-
 def get_tfidf_model(dataset_key: str) -> TFIDFModel:
-    """تحميل أو بناء نموذج TF-IDF لمجموعة بيانات معينة"""
-    index_dir = config.INDEX1_DIR if dataset_key == "dataset1" else config.INDEX2_DIR
+    # استخدم INDEX2_DIR مباشرة
+    index_dir = config.INDEX2_DIR
     model_path = os.path.join(index_dir, "tfidf_model.pkl")
 
     model = TFIDFModel()
 
-    # محاولة التحميل فقط إن كان الملف موجوداً وغير فارغ
     if os.path.exists(model_path) and os.path.getsize(model_path) > 0:
         try:
             model.load(model_path)
@@ -161,19 +139,14 @@ def get_tfidf_model(dataset_key: str) -> TFIDFModel:
         except Exception as e:
             print(f"[TF-IDF] Load error: {e}, model will be rebuilt")
 
-    # بناء النموذج من الصفر
-    docs_path = (
-        config.DATASET1_DOCS if dataset_key == "dataset1" else config.DATASET2_DOCS
-    )
+    docs_path = config.DATASET2_DOCS
     documents = load_documents_safely(docs_path)
 
     model.fit(documents)
     model.save(model_path)
     return model
 
-
-# ===== للتجربة =====
 if __name__ == "__main__":
-    model = get_tfidf_model("dataset1")
+    model = get_tfidf_model("dataset2")
     results = model.search("information retrieval systems", top_k=5)
     print("Results:", results)
