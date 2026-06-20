@@ -9,7 +9,6 @@ import config
 app = Flask(__name__)
 CORS(app)
 
-
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), "search_history.json")
 
 
@@ -36,7 +35,6 @@ def _normalize_for_history(query: str) -> str:
 
 
 def _append_history(query: str):
-    """يحفظ الاستعلام بدون أي تكرار"""
     query = query.strip()
     if not query:
         return
@@ -51,29 +49,35 @@ def _append_history(query: str):
 _search_history = _load_history()
 
 
+# ===================================================
+#  STATIC
+# ===================================================
 @app.route("/")
 def index():
     ui_folder = os.path.join(os.path.dirname(__file__), "..", "ui")
     return send_from_directory(ui_folder, "index.html")
 
 
+# ===================================================
+#  SEARCH
+# ===================================================
 @app.route("/api/search", methods=["POST"])
 def search():
     data = request.json
-    query = data.get("query", "").strip()
-    dataset = data.get("dataset", "dataset2")
+    query      = data.get("query", "").strip()
+    dataset    = data.get("dataset", "dataset2")
     model_type = data.get("model", "bm25")
-    top_k = int(data.get("top_k", config.RETRIEVAL["top_k_display"]))
+    top_k      = int(data.get("top_k", config.RETRIEVAL["top_k_display"]))
     use_refine = data.get("use_refinement", False)
 
     if not query:
         return jsonify({"error": "Query is empty"}), 400
 
     refinement_info = None
-    search_query = query
+    search_query    = query
     if use_refine:
         from services.query_refinement_service.refiner import refine_query
-        refined = refine_query(query, history=_search_history)
+        refined      = refine_query(query, history=_search_history)
         search_query = refined["refined_query"]
         refinement_info = refined
 
@@ -84,8 +88,12 @@ def search():
 
         extra_params = {}
         if model_type == "bm25":
-            extra_params["bm25_k1"] = float(data.get("bm25_k1", config.BM25_PARAMS["k1"]))
-            extra_params["bm25_b"] = float(data.get("bm25_b", config.BM25_PARAMS["b"]))
+            extra_params["bm25_k1"] = float(
+                data.get("bm25_k1", config.BM25_PARAMS["k1"])
+            )
+            extra_params["bm25_b"] = float(
+                data.get("bm25_b", config.BM25_PARAMS["b"])
+            )
         elif model_type == "hybrid_parallel":
             extra_params["fusion_method"] = data.get(
                 "fusion_method", config.HYBRID["fusion_method"]
@@ -99,10 +107,9 @@ def search():
             **extra_params,
         )
 
-        result["refined_query"] = search_query if use_refine else None
-        result["refinement_info"] = refinement_info
-        result["query"] = query
-
+        result["refined_query"]    = search_query if use_refine else None
+        result["refinement_info"]  = refinement_info
+        result["query"]            = query
         return jsonify(result)
 
     except ValueError as e:
@@ -111,13 +118,15 @@ def search():
         return jsonify({"error": f"Search failed: {str(e)}"}), 500
 
 
+# ===================================================
+#  EVALUATION
+# ===================================================
 @app.route("/api/evaluate", methods=["POST"])
 def evaluate():
-    """تقييم نموذج واحد على كل qrels queries"""
-    data = request.json
-    dataset = data.get("dataset", "dataset2")
+    data       = request.json
+    dataset    = data.get("dataset", "dataset2")
     model_type = data.get("model", "bm25")
-    max_q = data.get("max_queries", None)
+    max_q      = data.get("max_queries", None)
     if max_q is not None:
         try:
             max_q = int(max_q)
@@ -125,7 +134,7 @@ def evaluate():
                 max_q = None
         except (ValueError, TypeError):
             max_q = None
-    use_refine = data.get("use_refinement", False)
+    use_refine      = data.get("use_refinement", False)
     force_recompute = data.get("force_recompute", False)
 
     from services.search_service.searcher import SearchService
@@ -152,9 +161,8 @@ def evaluate():
 
 @app.route("/api/evaluate/all", methods=["POST"])
 def evaluate_all():
-    """تقييم كل النماذج على كل qrels queries"""
-    data = request.json
-    dataset = data.get("dataset", "dataset2")
+    data        = request.json
+    dataset     = data.get("dataset", "dataset2")
     max_queries = data.get("max_queries", None)
     if max_queries is not None:
         try:
@@ -164,6 +172,7 @@ def evaluate_all():
         except (ValueError, TypeError):
             max_queries = None
     force_recompute = data.get("force_recompute", False)
+
     from services.evaluation_service.evaluator import evaluate_all_models
     results = evaluate_all_models(
         dataset, max_queries=max_queries, use_cache=not force_recompute
@@ -173,23 +182,23 @@ def evaluate_all():
 
 @app.route("/api/evaluate/cache", methods=["DELETE"])
 def clear_eval_cache():
-    """مسح cache التقييم"""
     from services.evaluation_service.evaluator import clear_cache
     count = clear_cache()
     return jsonify({"message": f"Cleared {count} cached results"})
 
 
+# ===================================================
+#  DATASETS / HEALTH
+# ===================================================
 @app.route("/api/datasets", methods=["GET"])
 def get_datasets():
     from services.search_service.searcher import SearchService
-    return jsonify(
-        {
-            "datasets": [
-                {"key": "dataset2", "name": config.DATASET_NAMES["dataset2"]},
-            ],
-            "models": SearchService.get_supported_models(),
-        }
-    )
+    return jsonify({
+        "datasets": [
+            {"key": "dataset2", "name": config.DATASET_NAMES["dataset2"]},
+        ],
+        "models": SearchService.get_supported_models(),
+    })
 
 
 @app.route("/api/health", methods=["GET"])
@@ -197,17 +206,15 @@ def health():
     return jsonify({"status": "ok", "message": "IR System is running"})
 
 
-# ضيف هاد الكود بعد route /api/health مباشرة
-
+# ===================================================
+#  MULTILINGUAL
+# ===================================================
 @app.route("/api/multilingual/translate", methods=["POST"])
 def multilingual_translate():
-    """endpoint مستقل لتجربة Multilingual لحالها فقط"""
     data = request.json
     text = data.get("text", "").strip()
-
     if not text:
         return jsonify({"error": "Text is empty"}), 400
-
     try:
         from services.query_refinement_service.refiner import detect_and_translate
         result = detect_and_translate(text)
@@ -216,6 +223,9 @@ def multilingual_translate():
         return jsonify({"error": f"Translation failed: {str(e)}"}), 500
 
 
+# ===================================================
+#  HISTORY
+# ===================================================
 @app.route("/api/history", methods=["GET"])
 def get_history():
     return jsonify({"history": _search_history[-20:]})
@@ -228,11 +238,14 @@ def clear_history():
     return jsonify({"message": "History cleared successfully"})
 
 
+# ===================================================
+#  RAG
+# ===================================================
 @app.route("/api/rag", methods=["POST"])
 def rag_search():
-    data = request.json
-    query = data.get("query", "").strip()
-    dataset = data.get("dataset", "dataset2")
+    data       = request.json
+    query      = data.get("query", "").strip()
+    dataset    = data.get("dataset", "dataset2")
     model_type = data.get("model", "bm25")
 
     if not query:
@@ -255,18 +268,58 @@ def rag_search():
     from services.rag_service.rag import generate_answer
     rag_result = generate_answer(query, ranked)
 
-    return jsonify(
-        {
-            "query": query,
-            "dataset": dataset,
-            "model": model_type,
-            "retrieved_docs": ranked,
-            "rag_answer": rag_result.get("answer"),
-            "rag_success": rag_result.get("success"),
-        }
-    )
+    return jsonify({
+        "query":          query,
+        "dataset":        dataset,
+        "model":          model_type,
+        "retrieved_docs": ranked,
+        "rag_answer":     rag_result.get("answer"),
+        "rag_success":    rag_result.get("success"),
+    })
+
+# ===================================================
+#  TOPIC MODELING
+# ===================================================
+@app.route("/api/topics/run", methods=["POST"])
+def run_topics():
+    data            = request.json or {}
+    n_topics        = int(data.get("n_topics", 5))
+    force_recompute = data.get("force_recompute", False)
+
+    if n_topics < 2 or n_topics > 20:
+        return jsonify({"error": "n_topics must be between 2 and 20"}), 400
+
+    try:
+        from services.analysis_service.topic_modeling import run_lda
+        result = run_lda(
+            n_topics=n_topics,
+            force_recompute=force_recompute,
+        )
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/topics/compare", methods=["POST"])
+def compare_topics():
+    data    = request.json or {}
+    n_range = data.get("n_range", [3, 5, 7, 10])
+
+    try:
+        from services.analysis_service.topic_modeling import compare_topic_counts
+        result = compare_topic_counts(n_range=n_range)
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ===================================================
+#  MAIN
+# ===================================================
 if __name__ == "__main__":
     print("🚀 Running IR System API on http://localhost:5000")
     print("📊 Architecture: SOA with Search Service as Facade")
