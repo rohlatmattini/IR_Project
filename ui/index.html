@@ -44,7 +44,7 @@
 
   .layout {
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 300px 1fr;
     min-height: calc(100vh - 60px);
   }
 
@@ -55,6 +55,7 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    overflow-y: auto;
   }
 
   .section-title {
@@ -89,17 +90,52 @@
   }
   input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
 
+  /* BM25 controls */
   .bm25-controls { display: none; }
   .bm25-controls.visible { display: block; }
+
+  /* Hybrid controls */
+  .hybrid-controls { display: none; }
+  .hybrid-controls.visible { display: block; }
 
   .param-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.6rem;
   }
   .param-row label { font-size: 0.85rem; color: var(--muted); }
-  .param-row input { width: 80px; }
+  .param-row input[type="number"] { width: 80px; }
+
+  /* Weight slider row */
+  .weight-row {
+    margin-bottom: 0.75rem;
+  }
+  .weight-row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.3rem;
+  }
+  .weight-row-header label { font-size: 0.85rem; color: var(--muted); }
+  .weight-val {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 36px;
+    text-align: left;
+  }
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .weight-sum-note {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+  }
+  .weight-sum-note.warn { color: var(--yellow); }
 
   main { padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
 
@@ -183,7 +219,6 @@
     border-radius: 10px;
     padding: 1rem 1.25rem;
     transition: border-color 0.2s;
-    cursor: pointer;
   }
   .result-card:hover { border-color: var(--accent); }
 
@@ -204,7 +239,38 @@
   .result-score { font-size: 0.8rem; color: var(--green); font-weight: 600; }
   .result-title { font-weight: 600; margin-bottom: 0.4rem; color: var(--text); }
   .result-snippet { font-size: 0.88rem; color: var(--muted); line-height: 1.6; }
-  .result-id { font-size: 0.75rem; color: var(--border); margin-top: 0.4rem; }
+
+  /* Full text viewer */
+  .full-text-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.83rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    max-height: 400px;
+    overflow-y: auto;
+    color: var(--text);
+  }
+  .full-text-label {
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .db-badge {
+    background: #1e3a2f;
+    color: var(--green);
+    font-size: 0.7rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    border: 1px solid #2a5040;
+  }
 
   .eval-grid {
     display: grid;
@@ -327,6 +393,7 @@
       </select>
     </div>
 
+    <!-- BM25 params -->
     <div class="bm25-controls" id="bm25Controls">
       <div class="section-title">معاملات BM25</div>
       <div class="param-row">
@@ -339,12 +406,48 @@
       </div>
     </div>
 
-    <div id="hybridControls" style="display:none">
-      <div class="section-title">طريقة الدمج</div>
-      <select id="fusionMethod">
-        <option value="rrf">RRF</option>
-        <option value="linear">Linear</option>
-      </select>
+    <!-- Hybrid controls: fusion method + weights -->
+    <div class="hybrid-controls" id="hybridControls">
+      <div class="section-title">إعدادات Hybrid</div>
+
+      <div class="param-row" style="margin-bottom:0.75rem">
+        <label>طريقة الدمج</label>
+        <select id="fusionMethod" style="width:auto;padding:0.3rem 0.5rem;font-size:0.85rem" onchange="onFusionChange()">
+          <option value="rrf">RRF</option>
+          <option value="linear">Linear</option>
+        </select>
+      </div>
+
+      <!-- Linear weights — shown only when Linear is selected -->
+      <div id="linearWeights" style="display:none">
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem">أوزان الدمج (Linear)</div>
+
+        <div class="weight-row">
+          <div class="weight-row-header">
+            <label>TF-IDF</label>
+            <span class="weight-val" id="wTfidfVal">0.30</span>
+          </div>
+          <input type="range" id="wTfidf" min="0" max="1" step="0.05" value="0.30" oninput="onWeightChange()">
+        </div>
+
+        <div class="weight-row">
+          <div class="weight-row-header">
+            <label>BM25</label>
+            <span class="weight-val" id="wBm25Val">0.40</span>
+          </div>
+          <input type="range" id="wBm25" min="0" max="1" step="0.05" value="0.40" oninput="onWeightChange()">
+        </div>
+
+        <div class="weight-row">
+          <div class="weight-row-header">
+            <label>Embedding</label>
+            <span class="weight-val" id="wEmbVal">0.30</span>
+          </div>
+          <input type="range" id="wEmb" min="0" max="1" step="0.05" value="0.30" oninput="onWeightChange()">
+        </div>
+
+        <div class="weight-sum-note" id="weightSumNote">المجموع: 1.00</div>
+      </div>
     </div>
 
     <div>
@@ -400,15 +503,9 @@
     <!-- ==================== EVAL TAB ==================== -->
     <div id="tab-eval" style="display:none">
       <div style="margin-bottom:1rem;display:flex;gap:0.75rem;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="runEvaluation(false)">
-          تقييم بدون Refinement
-        </button>
-        <button class="btn btn-primary" onclick="runEvaluation(true)">
-          تقييم مع Refinement
-        </button>
-        <button class="btn btn-outline" onclick="runEvalAll()">
-          تقييم كل النماذج
-        </button>
+        <button class="btn btn-primary" onclick="runEvaluation(false)">تقييم بدون Refinement</button>
+        <button class="btn btn-primary" onclick="runEvaluation(true)">تقييم مع Refinement</button>
+        <button class="btn btn-outline" onclick="runEvalAll()">تقييم كل النماذج</button>
       </div>
       <div id="evalLoading" class="loading">
         <div class="spinner"></div><span>جارٍ التقييم...</span>
@@ -418,8 +515,7 @@
 
     <!-- ==================== HISTORY TAB ==================== -->
     <div id="tab-history" style="display:none">
-      <div style="margin-bottom:1rem;display:flex;
-                  justify-content:space-between;align-items:center">
+      <div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
         <span style="color:var(--muted)">استعلاماتك السابقة</span>
         <button class="btn btn-outline" onclick="clearHistory()">مسح السجل</button>
       </div>
@@ -430,7 +526,7 @@
     <div id="tab-rag" style="display:none">
       <div style="margin-bottom:1rem">
         <p style="color:var(--muted);margin-bottom:0.75rem;font-size:0.9rem">
-          اكتب استعلامك وسيقوم النظام باسترجاع الوثائق وتوليد إجابة بالذكاء الاصطناعي
+          اكتب استعلامك (بالعربي أو الإنكليزي) وسيقوم النظام باسترجاع الوثائق وتوليد إجابة بالذكاء الاصطناعي بنفس لغة سؤالك
         </p>
         <div class="search-box">
           <input type="text" id="ragInput" placeholder="اسأل سؤالاً مباشراً...">
@@ -441,16 +537,12 @@
         <div class="spinner"></div><span>جارٍ التوليد...</span>
       </div>
       <div id="ragAnswer" style="display:none">
-        <div style="background:var(--surface2);border:1px solid var(--accent);
-                    border-radius:10px;padding:1.25rem;margin-bottom:1rem">
-          <div style="color:var(--accent);font-weight:600;margin-bottom:0.5rem">
-            🤖 الإجابة المولّدة
-          </div>
+        <div style="background:var(--surface2);border:1px solid var(--accent);border-radius:10px;padding:1.25rem;margin-bottom:1rem">
+          <div style="color:var(--accent);font-weight:600;margin-bottom:0.5rem">🤖 الإجابة المولّدة</div>
+          <div id="ragTranslationNote" style="display:none;color:var(--muted);font-size:0.8rem;margin-bottom:0.5rem"></div>
           <div id="ragAnswerText" style="line-height:1.8;white-space:pre-wrap"></div>
         </div>
-        <div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">
-          📄 الوثائق المستخدمة:
-        </div>
+        <div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">📄 الوثائق المستخدمة:</div>
         <div id="ragSources"></div>
       </div>
     </div>
@@ -462,123 +554,71 @@
           اكتب نص بالعربي أو الإنجليزي ليكشف النظام اللغة ويترجمها تلقائياً
         </p>
         <div class="search-box">
-          <input type="text" id="mlInput"
-                 placeholder="اكتب استعلام بالعربي أو الإنجليزي...">
-          <button class="btn btn-primary" onclick="doMultilingual()">
-            🌐 كشف وترجمة
-          </button>
+          <input type="text" id="mlInput" placeholder="اكتب استعلام بالعربي أو الإنجليزي...">
+          <button class="btn btn-primary" onclick="doMultilingual()">🌐 كشف وترجمة</button>
         </div>
       </div>
       <div id="mlLoading" class="loading">
         <div class="spinner"></div><span>جارٍ الكشف والترجمة...</span>
       </div>
       <div id="mlResult" style="display:none">
-        <div style="background:var(--surface2);border:1px solid var(--border);
-                    border-radius:10px;padding:1.25rem">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1.25rem">
           <div style="margin-bottom:0.75rem">
             <span style="color:var(--muted);font-size:0.85rem">اللغة المكتشفة:</span>
-            <span id="mlLang"
-                  style="color:var(--accent);font-weight:600;margin-right:0.5rem"></span>
+            <span id="mlLang" style="color:var(--accent);font-weight:600;margin-right:0.5rem"></span>
           </div>
           <div style="margin-bottom:0.5rem">
             <span style="color:var(--muted);font-size:0.85rem">النص الأصلي:</span>
             <div id="mlOriginal" style="margin-top:0.3rem"></div>
           </div>
-          <div id="mlTranslatedBox"
-               style="display:none;margin-top:0.75rem;padding-top:0.75rem;
-                      border-top:1px solid var(--border)">
+          <div id="mlTranslatedBox" style="display:none;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border)">
             <span style="color:var(--muted);font-size:0.85rem">الترجمة:</span>
-            <div id="mlTranslated"
-                 style="margin-top:0.3rem;color:var(--green)"></div>
+            <div id="mlTranslated" style="margin-top:0.3rem;color:var(--green)"></div>
           </div>
         </div>
       </div>
     </div>
 
-   
     <!-- ==================== TOPIC MODELING TAB ==================== -->
     <div id="tab-topics" style="display:none">
-
       <p style="color:var(--muted);margin-bottom:1rem;font-size:0.9rem">
-        LDA Topic Modeling مع تقييم Perplexity و Coherence Score
-        ورسومات Topic-Word Heatmap
+        LDA Topic Modeling مع تقييم Perplexity و Coherence Score ورسومات Topic-Word Heatmap
       </p>
-
-      <!-- Controls -->
-      <div style="display:flex;gap:1rem;align-items:flex-end;
-                  flex-wrap:wrap;margin-bottom:1.25rem">
+      <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.25rem">
         <div>
-          <label style="font-size:0.85rem;color:var(--muted);
-                         display:block;margin-bottom:0.3rem">
-            عدد الـ Topics
-          </label>
-          <input type="number" id="nTopics" value="5"
-                 min="2" max="20" style="width:100px">
+          <label style="font-size:0.85rem;color:var(--muted);display:block;margin-bottom:0.3rem">عدد الـ Topics</label>
+          <input type="number" id="nTopics" value="5" min="2" max="20" style="width:100px">
         </div>
-        <button class="btn btn-primary" onclick="runTopicModeling()">
-          📚 تشغيل LDA
-        </button>
-        <button class="btn btn-outline" onclick="compareTopics()">
-          📊 مقارنة عدد Topics
-        </button>
+        <button class="btn btn-primary" onclick="runTopicModeling()">📚 تشغيل LDA</button>
+        <button class="btn btn-outline" onclick="compareTopics()">📊 مقارنة عدد Topics</button>
       </div>
-
       <div id="topicsLoading" class="loading">
-        <div class="spinner"></div>
-        <span>جارٍ تدريب LDA — قد يأخذ 2-3 دقائق...</span>
+        <div class="spinner"></div><span>جارٍ تدريب LDA — قد يأخذ 2-3 دقائق...</span>
       </div>
-
-      <!-- Metrics -->
       <div id="topicMetrics" style="display:none">
         <div class="eval-grid" style="margin-bottom:1.5rem">
-          <div class="metric-card">
-            <div class="metric-value" id="tm-topics">-</div>
-            <div class="metric-name">عدد الـ Topics</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-value" id="tm-docs">-</div>
-            <div class="metric-name">عدد الوثائق</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-value" id="tm-perp">-</div>
-            <div class="metric-name">Perplexity ↓</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-value" id="tm-coh">-</div>
-            <div class="metric-name">Coherence ↑</div>
-          </div>
+          <div class="metric-card"><div class="metric-value" id="tm-topics">-</div><div class="metric-name">عدد الـ Topics</div></div>
+          <div class="metric-card"><div class="metric-value" id="tm-docs">-</div><div class="metric-name">عدد الوثائق</div></div>
+          <div class="metric-card"><div class="metric-value" id="tm-perp">-</div><div class="metric-name">Perplexity ↓</div></div>
+          <div class="metric-card"><div class="metric-value" id="tm-coh">-</div><div class="metric-name">Coherence ↑</div></div>
         </div>
-
-        <!-- Charts row 1 -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;
-                    gap:1rem;margin-bottom:1rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
           <div class="chart-box">
             <div class="chart-title">📊 عدد الوثائق لكل Topic</div>
             <canvas id="topicSizeChart" height="260"></canvas>
           </div>
           <div class="chart-box">
             <div class="chart-title">🔑 أوزان الكلمات — اختر Topic</div>
-            <select id="topicSelector" onchange="updateWordChart()"
-                    style="margin-bottom:0.5rem;width:auto;
-                           padding:0.3rem 0.5rem;font-size:0.85rem">
-            </select>
+            <select id="topicSelector" onchange="updateWordChart()" style="margin-bottom:0.5rem;width:auto;padding:0.3rem 0.5rem;font-size:0.85rem"></select>
             <canvas id="wordWeightChart" height="220"></canvas>
           </div>
         </div>
-
-        <!-- Heatmap -->
         <div class="chart-box" style="margin-bottom:1rem">
-          <div class="chart-title">
-            🌡️ Topic-Word Heatmap — أوزان أهم الكلمات لكل Topic
-          </div>
+          <div class="chart-title">🌡️ Topic-Word Heatmap</div>
           <canvas id="heatmapChart" height="200"></canvas>
         </div>
-
-        <!-- Topic Cards -->
         <div id="topicsCards"></div>
       </div>
-
-      <!-- Compare section -->
       <div id="topicsCompareSection" style="display:none">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
           <div class="chart-box">
@@ -591,8 +631,7 @@
           </div>
         </div>
       </div>
-
-    </div><!-- end topics tab -->
+    </div>
 
   </main>
 </div>
@@ -608,62 +647,60 @@ let _chartInstances = {};
 let _topicData = null;
 
 function destroyChart(id) {
-  if (_chartInstances[id]) {
-    _chartInstances[id].destroy();
-    delete _chartInstances[id];
-  }
+  if (_chartInstances[id]) { _chartInstances[id].destroy(); delete _chartInstances[id]; }
 }
 
 function getColors(n) {
-  const palette = [
-    '#6c8fff','#a78bfa','#34d399','#fbbf24','#f87171',
-    '#38bdf8','#fb923c','#a3e635','#e879f9','#2dd4bf',
-    '#f472b6','#818cf8','#4ade80','#facc15','#60a5fa',
-    '#c084fc','#86efac','#fde68a','#fca5a5','#7dd3fc'
-  ];
+  const palette = ['#6c8fff','#a78bfa','#34d399','#fbbf24','#f87171','#38bdf8','#fb923c','#a3e635','#e879f9','#2dd4bf','#f472b6','#818cf8','#4ade80','#facc15','#60a5fa','#c084fc','#86efac','#fde68a','#fca5a5','#7dd3fc'];
   return Array.from({ length: n }, (_, i) => palette[i % palette.length]);
 }
 
-const CHART_DEFAULTS = {
-  color: '#e2e8f0',
-  gridColor: '#2e3347',
-  mutedColor: '#64748b'
-};
-
 function axisStyle(title = '') {
   return {
-    ticks: { color: CHART_DEFAULTS.mutedColor },
-    grid:  { color: CHART_DEFAULTS.gridColor  },
-    ...(title ? {
-      title: { display: true, text: title, color: CHART_DEFAULTS.mutedColor }
-    } : {})
+    ticks: { color: '#64748b' },
+    grid:  { color: '#2e3347' },
+    ...(title ? { title: { display: true, text: title, color: '#64748b' } } : {})
   };
 }
 
 // ===================================================
-//  SIDEBAR / MODEL
+//  SIDEBAR / MODEL CHANGE
 // ===================================================
 function onModelChange() {
   const m = document.getElementById('modelSelect').value;
-  document.getElementById('bm25Controls').className =
-    'bm25-controls' + (m === 'bm25' ? ' visible' : '');
-  document.getElementById('hybridControls').style.display =
-    m === 'hybrid_parallel' ? 'block' : 'none';
+  document.getElementById('bm25Controls').className = 'bm25-controls' + (m === 'bm25' ? ' visible' : '');
+  document.getElementById('hybridControls').className = 'hybrid-controls' + (m === 'hybrid_parallel' ? ' visible' : '');
+  if (m === 'hybrid_parallel') onFusionChange();
 }
+
+function onFusionChange() {
+  const f = document.getElementById('fusionMethod').value;
+  document.getElementById('linearWeights').style.display = f === 'linear' ? 'block' : 'none';
+}
+
+function onWeightChange() {
+  const tw = parseFloat(document.getElementById('wTfidf').value);
+  const bw = parseFloat(document.getElementById('wBm25').value);
+  const ew = parseFloat(document.getElementById('wEmb').value);
+  document.getElementById('wTfidfVal').textContent = tw.toFixed(2);
+  document.getElementById('wBm25Val').textContent  = bw.toFixed(2);
+  document.getElementById('wEmbVal').textContent   = ew.toFixed(2);
+  const sum = (tw + bw + ew).toFixed(2);
+  const note = document.getElementById('weightSumNote');
+  note.textContent = `المجموع: ${sum}`;
+  note.className = 'weight-sum-note' + (Math.abs(sum - 1) > 0.01 ? ' warn' : '');
+}
+
 onModelChange();
 
 // ===================================================
 //  TABS
 // ===================================================
-const ALL_TABS = [
-  'results','eval','history','rag',
-  'multilingual','topics'  // ← حذفنا clustering
-];
+const ALL_TABS = ['results','eval','history','rag','multilingual','topics'];
 
 function switchTab(name) {
   ALL_TABS.forEach(t => {
-    document.getElementById('tab-' + t).style.display =
-      t === name ? 'block' : 'none';
+    document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
   });
   document.querySelectorAll('.tab').forEach((btn, i) => {
     btn.classList.toggle('active', ALL_TABS[i] === name);
@@ -681,10 +718,10 @@ async function doSearch() {
   const btn = document.getElementById('searchBtn');
   btn.disabled = true;
   document.getElementById('loadingSpinner').classList.add('visible');
-  document.getElementById('emptyState').style.display    = 'none';
-  document.getElementById('errorMsg').style.display      = 'none';
-  document.getElementById('refinementInfo').style.display= 'none';
-  document.getElementById('metaBar').style.display       = 'none';
+  document.getElementById('emptyState').style.display     = 'none';
+  document.getElementById('errorMsg').style.display       = 'none';
+  document.getElementById('refinementInfo').style.display = 'none';
+  document.getElementById('metaBar').style.display        = 'none';
   document.getElementById('resultsList').innerHTML        = '';
 
   const model = document.getElementById('modelSelect').value;
@@ -695,23 +732,28 @@ async function doSearch() {
     top_k:          parseInt(document.getElementById('topK').value),
     use_refinement: document.getElementById('useRefinement').checked,
   };
+
   if (model === 'bm25') {
     body.bm25_k1 = parseFloat(document.getElementById('bm25k1').value);
     body.bm25_b  = parseFloat(document.getElementById('bm25b').value);
   }
+
   if (model === 'hybrid_parallel') {
-    body.fusion_method = document.getElementById('fusionMethod').value;
+    const fusion = document.getElementById('fusionMethod').value;
+    body.fusion_method = fusion;
+    if (fusion === 'linear') {
+      body.tfidf_weight     = parseFloat(document.getElementById('wTfidf').value);
+      body.bm25_weight      = parseFloat(document.getElementById('wBm25').value);
+      body.embedding_weight = parseFloat(document.getElementById('wEmb').value);
+    }
   }
 
   try {
-    const res  = await fetch(`${API}/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    const res  = await fetch(`${API}/search`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
+    // Refinement info
     if (data.refinement_info) {
       const ri = data.refinement_info;
       const corrections = ri.corrections?.join(' | ') || '';
@@ -730,10 +772,12 @@ async function doSearch() {
 
     const list = document.getElementById('resultsList');
     if (!data.results?.length) {
-      list.innerHTML =
-        '<div class="empty-state"><div class="icon">😶</div><p>لا توجد نتائج</p></div>';
+      list.innerHTML = '<div class="empty-state"><div class="icon">😶</div><p>لا توجد نتائج</p></div>';
     } else {
-      list.innerHTML = data.results.map(r => `
+      list.innerHTML = data.results.map(r => {
+        const hasFullText = r.full_text && r.full_text.trim().length > 0;
+        const escaped = (r.full_text || r.snippet || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return `
         <div class="result-card" style="margin-bottom:0.75rem">
           <div class="result-header">
             <span class="result-rank">#${r.rank}</span>
@@ -743,23 +787,29 @@ async function doSearch() {
           <div style="color:var(--accent);font-size:0.78rem;margin-bottom:0.4rem">
             doc_id: <code style="color:var(--text)">${r.doc_id}</code>
           </div>
-          <details style="margin-top:0.4rem">
-            <summary style="cursor:pointer;color:var(--muted);font-size:0.83rem">
-              📖 النص الكامل
+          <div class="result-snippet">${r.snippet}</div>
+          ${hasFullText ? `
+          <details style="margin-top:0.75rem">
+            <summary style="cursor:pointer;color:var(--accent);font-size:0.83rem;list-style:none;display:flex;align-items:center;gap:0.4rem">
+              📄 <span>عرض الوثيقة الكاملة</span>
+              <span class="db-badge">MongoDB</span>
             </summary>
-            <div style="background:var(--surface2);padding:0.75rem;border-radius:6px;
-                        margin-top:0.4rem;font-size:0.83rem;line-height:1.7;
-                        white-space:pre-wrap;max-height:380px;overflow-y:auto">
-              ${(r.full_text||r.snippet||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+            <div class="full-text-label" style="margin-top:0.5rem">
+              النص الكامل من قاعدة البيانات
+              <span class="db-badge">MongoDB</span>
             </div>
-          </details>
-          <div class="result-snippet" style="margin-top:0.5rem">${r.snippet}</div>
-        </div>`).join('');
+            <div class="full-text-box">${escaped}</div>
+          </details>` : `
+          <div style="margin-top:0.5rem;font-size:0.78rem;color:var(--muted)">
+            ⚠️ النص الكامل غير متاح من MongoDB
+          </div>`}
+        </div>`;
+      }).join('');
     }
 
   } catch(err) {
-    document.getElementById('errorMsg').style.display = 'block';
-    document.getElementById('errorMsg').textContent   = '❌ ' + err.message;
+    document.getElementById('errorMsg').style.display  = 'block';
+    document.getElementById('errorMsg').textContent    = '❌ ' + err.message;
   } finally {
     btn.disabled = false;
     document.getElementById('loadingSpinner').classList.remove('visible');
@@ -773,57 +823,32 @@ async function runEvaluation(useRefinement) {
   const loading = document.getElementById('evalLoading');
   loading.classList.add('visible');
   document.getElementById('evalResults').innerHTML = '';
-
   try {
     const res  = await fetch(`${API}/evaluate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        dataset:        document.getElementById('datasetSelect').value,
-        model:          document.getElementById('modelSelect').value,
-        use_refinement: useRefinement
-      })
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ dataset: document.getElementById('datasetSelect').value, model: document.getElementById('modelSelect').value, use_refinement: useRefinement })
     });
     const data = await res.json();
     showEvalResults(data, useRefinement);
   } catch(err) {
-    document.getElementById('evalResults').innerHTML =
-      '<div class="error-msg">' + err.message + '</div>';
-  } finally {
-    loading.classList.remove('visible');
-  }
+    document.getElementById('evalResults').innerHTML = '<div class="error-msg">' + err.message + '</div>';
+  } finally { loading.classList.remove('visible'); }
 }
 
 function showEvalResults(data, refined) {
   const label = refined ? 'بعد Refinement' : 'بدون Refinement';
   document.getElementById('evalResults').innerHTML = `
-    <div style="background:var(--surface2);padding:1rem;border-radius:8px;
-                margin-bottom:1rem;border-right:3px solid var(--accent)">
-      <div style="color:var(--accent);font-weight:600;margin-bottom:0.5rem">
-        📊 ${label} — ${data.dataset}
-      </div>
+    <div style="background:var(--surface2);padding:1rem;border-radius:8px;margin-bottom:1rem;border-right:3px solid var(--accent)">
+      <div style="color:var(--accent);font-weight:600;margin-bottom:0.5rem">📊 ${label} — ${data.dataset}</div>
       <div style="font-size:0.85rem;color:var(--muted);line-height:1.8">
-        ✅ تم تقييم: <b style="color:var(--green)">${data.num_queries_evaluated}</b>
-        استعلام من أصل <b>${data.num_queries_in_qrels}</b>
+        ✅ تم تقييم: <b style="color:var(--green)">${data.num_queries_evaluated}</b> استعلام من أصل <b>${data.num_queries_in_qrels}</b>
       </div>
     </div>
     <div class="eval-grid">
-      <div class="metric-card">
-        <div class="metric-value">${data.MAP}</div>
-        <div class="metric-name">MAP</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">${data.Recall}</div>
-        <div class="metric-name">Recall</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">${data['P@10']}</div>
-        <div class="metric-name">Precision@10</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">${data['nDCG@10']}</div>
-        <div class="metric-name">nDCG@10</div>
-      </div>
+      <div class="metric-card"><div class="metric-value">${data.MAP}</div><div class="metric-name">MAP</div></div>
+      <div class="metric-card"><div class="metric-value">${data.Recall}</div><div class="metric-name">Recall</div></div>
+      <div class="metric-card"><div class="metric-value">${data['P@10']}</div><div class="metric-name">Precision@10</div></div>
+      <div class="metric-card"><div class="metric-value">${data['nDCG@10']}</div><div class="metric-name">nDCG@10</div></div>
     </div>`;
 }
 
@@ -832,41 +857,25 @@ async function runEvalAll() {
   loading.classList.add('visible');
   document.getElementById('evalResults').innerHTML = '';
   try {
-    const res  = await fetch(`${API}/evaluate/all`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        dataset: document.getElementById('datasetSelect').value
-      })
-    });
+    const res  = await fetch(`${API}/evaluate/all`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dataset: document.getElementById('datasetSelect').value }) });
     const data = await res.json();
-    let html =
-      `<div style="overflow-x:auto">
-       <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
-       <tr style="color:var(--muted)">
-         <th style="padding:0.5rem;text-align:right">النموذج</th>
-         <th>MAP</th><th>Recall</th><th>P@10</th><th>nDCG@10</th>
-       </tr>`;
+    let html = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+      <tr style="color:var(--muted)"><th style="padding:0.5rem;text-align:right">النموذج</th><th>MAP</th><th>Recall</th><th>P@10</th><th>nDCG@10</th></tr>`;
     for (const [model, vals] of Object.entries(data)) {
-      const b = vals.before_refinement;
-      const a = vals.after_refinement;
-      html += `
-        <tr style="border-top:1px solid var(--border)">
-          <td style="padding:0.5rem;color:var(--accent)">${model}</td>
-          <td style="text-align:center">${b.MAP} → <b style="color:var(--green)">${a.MAP}</b></td>
-          <td style="text-align:center">${b.Recall} → <b style="color:var(--green)">${a.Recall}</b></td>
-          <td style="text-align:center">${b['P@10']} → <b style="color:var(--green)">${a['P@10']}</b></td>
-          <td style="text-align:center">${b['nDCG@10']} → <b style="color:var(--green)">${a['nDCG@10']}</b></td>
-        </tr>`;
+      const b = vals.before_refinement, a = vals.after_refinement;
+      html += `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:0.5rem;color:var(--accent)">${model}</td>
+        <td style="text-align:center">${b.MAP} → <b style="color:var(--green)">${a.MAP}</b></td>
+        <td style="text-align:center">${b.Recall} → <b style="color:var(--green)">${a.Recall}</b></td>
+        <td style="text-align:center">${b['P@10']} → <b style="color:var(--green)">${a['P@10']}</b></td>
+        <td style="text-align:center">${b['nDCG@10']} → <b style="color:var(--green)">${a['nDCG@10']}</b></td>
+      </tr>`;
     }
     html += '</table></div>';
     document.getElementById('evalResults').innerHTML = html;
   } catch(e) {
-    document.getElementById('evalResults').innerHTML =
-      '<div class="error-msg">' + e.message + '</div>';
-  } finally {
-    loading.classList.remove('visible');
-  }
+    document.getElementById('evalResults').innerHTML = '<div class="error-msg">' + e.message + '</div>';
+  } finally { loading.classList.remove('visible'); }
 }
 
 // ===================================================
@@ -881,9 +890,7 @@ async function loadHistory() {
       el.innerHTML = '<p style="color:var(--muted)">لا يوجد سجل بعد</p>';
     } else {
       el.innerHTML = [...data.history].reverse().map(q =>
-        `<span class="history-chip"
-               onclick="document.getElementById('queryInput').value='${q.replace(/'/g,"\\'")}'"
-         >${q}</span>`
+        `<span class="history-chip" onclick="document.getElementById('queryInput').value='${q.replace(/'/g,"\\'")}'">` + q + `</span>`
       ).join('');
     }
   } catch(e) {}
@@ -900,37 +907,35 @@ async function clearHistory() {
 async function doRAG() {
   const query = document.getElementById('ragInput').value.trim();
   if (!query) return;
-
   document.getElementById('ragLoading').classList.add('visible');
   document.getElementById('ragAnswer').style.display = 'none';
-
   try {
-    const res  = await fetch(`${API}/rag`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query,
-        dataset: document.getElementById('datasetSelect').value,
-        model:   document.getElementById('modelSelect').value,
-      })
-    });
+    const res  = await fetch(`${API}/rag`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ query, dataset: document.getElementById('datasetSelect').value, model: document.getElementById('modelSelect').value }) });
     const data = await res.json();
-    document.getElementById('ragAnswerText').textContent =
-      data.rag_answer || 'لم يتم توليد إجابة';
-    document.getElementById('ragSources').innerHTML =
-      (data.retrieved_docs || []).map((d, i) => `
-        <div class="result-card" style="margin-bottom:0.5rem">
-          <span class="result-rank">#${i+1}</span>
-          <span style="margin-right:0.5rem;font-weight:600">${d.title||d.doc_id}</span>
-          <div class="result-snippet">${d.snippet}</div>
-        </div>`).join('');
+
+    document.getElementById('ragAnswerText').textContent = data.rag_answer || 'لم يتم توليد إجابة';
+    document.getElementById('ragSources').innerHTML = (data.retrieved_docs || []).map((d, i) => `
+      <div class="result-card" style="margin-bottom:0.5rem">
+        <span class="result-rank">#${i+1}</span>
+        <span style="margin-right:0.5rem;font-weight:600">${d.title||d.doc_id}</span>
+        <div class="result-snippet">${d.snippet}</div>
+      </div>`).join('');
+
+    // إظهار ملاحظة الترجمة فقط إذا تمت ترجمة الاستعلام فعلياً للبحث، وإخفاؤها بغير ذلك
+    const noteEl = document.getElementById('ragTranslationNote');
+    if (data.search_query && data.search_query !== data.query) {
+      noteEl.style.display = 'block';
+      noteEl.textContent = `🔤 تمت الترجمة للبحث: "${data.search_query}"`;
+    } else {
+      noteEl.style.display = 'none';
+      noteEl.textContent = '';
+    }
+
     document.getElementById('ragAnswer').style.display = 'block';
   } catch(e) {
     document.getElementById('ragAnswerText').textContent = 'خطأ: ' + e.message;
-    document.getElementById('ragAnswer').style.display  = 'block';
-  } finally {
-    document.getElementById('ragLoading').classList.remove('visible');
-  }
+    document.getElementById('ragAnswer').style.display = 'block';
+  } finally { document.getElementById('ragLoading').classList.remove('visible'); }
 }
 
 // ===================================================
@@ -939,23 +944,14 @@ async function doRAG() {
 async function doMultilingual() {
   const text = document.getElementById('mlInput').value.trim();
   if (!text) return;
-
   document.getElementById('mlLoading').classList.add('visible');
   document.getElementById('mlResult').style.display = 'none';
-
   try {
-    const res  = await fetch(`${API}/multilingual/translate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
+    const res  = await fetch(`${API}/multilingual/translate`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-
-    document.getElementById('mlLang').textContent =
-      data.detected_language === 'ar' ? 'العربية (ar)' : 'English (en)';
+    document.getElementById('mlLang').textContent = data.detected_language === 'ar' ? 'العربية (ar)' : 'English (en)';
     document.getElementById('mlOriginal').textContent = data.original_text;
-
     if (data.translation_applied) {
       document.getElementById('mlTranslatedBox').style.display = 'block';
       document.getElementById('mlTranslated').textContent = data.translated_text;
@@ -967,9 +963,7 @@ async function doMultilingual() {
     document.getElementById('mlOriginal').textContent = 'خطأ: ' + e.message;
     document.getElementById('mlTranslatedBox').style.display = 'none';
     document.getElementById('mlResult').style.display = 'block';
-  } finally {
-    document.getElementById('mlLoading').classList.remove('visible');
-  }
+  } finally { document.getElementById('mlLoading').classList.remove('visible'); }
 }
 
 // ===================================================
@@ -979,242 +973,85 @@ async function runTopicModeling() {
   const n = parseInt(document.getElementById('nTopics').value);
   document.getElementById('topicsLoading').classList.add('visible');
   document.getElementById('topicMetrics').style.display = 'none';
-
   try {
-    const res  = await fetch(`${API}/topics/run`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ n_topics: n })
-    });
+    const res  = await fetch(`${API}/topics/run`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ n_topics: n }) });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     _topicData = data;
     displayTopicResults(data);
     document.getElementById('topicMetrics').style.display = 'block';
-  } catch(e) {
-    alert('خطأ Topic Modeling: ' + e.message);
-  } finally {
-    document.getElementById('topicsLoading').classList.remove('visible');
-  }
+  } catch(e) { alert('خطأ Topic Modeling: ' + e.message); }
+  finally { document.getElementById('topicsLoading').classList.remove('visible'); }
 }
 
 function displayTopicResults(data) {
-  // Metrics
   document.getElementById('tm-topics').textContent = data.n_topics;
   document.getElementById('tm-docs').textContent   = data.n_documents;
   const p = data.perplexity;
-  document.getElementById('tm-perp').textContent =
-    p > 10000 ? (p/1000).toFixed(1)+'K' : p;
-  document.getElementById('tm-coh').textContent = data.coherence_score;
-
+  document.getElementById('tm-perp').textContent = p > 10000 ? (p/1000).toFixed(1)+'K' : p;
+  document.getElementById('tm-coh').textContent  = data.coherence_score;
   const colors = getColors(data.n_topics);
-
-  // --- Bar: topic sizes ---
   destroyChart('topicSizeChart');
-  _chartInstances['topicSizeChart'] = new Chart(
-    document.getElementById('topicSizeChart'), {
-      type: 'bar',
-      data: {
-        labels: data.topics.map(t => t.label),
-        datasets: [{
-          label: 'عدد الوثائق',
-          data: data.topic_sizes,
-          backgroundColor: colors,
-          borderRadius: 5
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        plugins: { legend: { display: false } },
-        scales: {
-          x: axisStyle(''),
-          y: { ticks: { color: '#e2e8f0' }, grid: { color: '#2e3347' } }
-        }
-      }
-    }
-  );
-
-  // Topic selector
+  _chartInstances['topicSizeChart'] = new Chart(document.getElementById('topicSizeChart'), {
+    type:'bar', data:{ labels: data.topics.map(t=>t.label), datasets:[{ label:'عدد الوثائق', data: data.topic_sizes, backgroundColor: colors, borderRadius:5 }] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:axisStyle(''), y:{ticks:{color:'#e2e8f0'},grid:{color:'#2e3347'}} } }
+  });
   const sel = document.getElementById('topicSelector');
-  sel.innerHTML = data.topics.map(t =>
-    `<option value="${t.topic_id}">${t.label} (${t.doc_count} docs)</option>`
-  ).join('');
+  sel.innerHTML = data.topics.map(t => `<option value="${t.topic_id}">${t.label} (${t.doc_count} docs)</option>`).join('');
   updateWordChart();
-
-  // Heatmap
   drawHeatmap(data.heatmap, data.topics, colors);
-
-  // Cards
   document.getElementById('topicsCards').innerHTML =
-    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
-                 gap:1rem;margin-top:0.5rem">` +
-    data.topics.map((t, i) => `
+    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;margin-top:0.5rem">` +
+    data.topics.map((t,i) => `
       <div class="topic-card" style="border-top-color:${colors[i]}">
-        <div style="font-weight:700;color:${colors[i]};margin-bottom:0.4rem">
-          ${t.label}
-        </div>
-        <div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">
-          ${t.doc_count} وثيقة
-        </div>
-        <div>
-          ${t.words.slice(0,8).map(w =>
-            `<span class="tag"
-                   style="background:${colors[i]}22;
-                          border:1px solid ${colors[i]}55;
-                          color:${colors[i]}">${w}</span>`
-          ).join('')}
-        </div>
-      </div>`
-    ).join('') + '</div>';
+        <div style="font-weight:700;color:${colors[i]};margin-bottom:0.4rem">${t.label}</div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">${t.doc_count} وثيقة</div>
+        <div>${t.words.slice(0,8).map(w=>`<span class="tag" style="background:${colors[i]}22;border:1px solid ${colors[i]}55;color:${colors[i]}">${w}</span>`).join('')}</div>
+      </div>`).join('') + '</div>';
 }
 
 function updateWordChart() {
   if (!_topicData) return;
-  const id    = parseInt(document.getElementById('topicSelector').value);
+  const id = parseInt(document.getElementById('topicSelector').value);
   const topic = _topicData.topics[id];
-
   destroyChart('wordWeightChart');
-  _chartInstances['wordWeightChart'] = new Chart(
-    document.getElementById('wordWeightChart'), {
-      type: 'bar',
-      data: {
-        labels: topic.words,
-        datasets: [{
-          label: 'Weight',
-          data: topic.weights,
-          backgroundColor: '#6c8fff99',
-          borderColor: '#6c8fff',
-          borderWidth: 1,
-          borderRadius: 3
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        plugins: { legend: { display: false } },
-        scales: {
-          x: axisStyle('Weight'),
-          y: {
-            ticks: { color: '#e2e8f0', font: { size: 11 } },
-            grid:  { color: '#2e3347' }
-          }
-        }
-      }
-    }
-  );
+  _chartInstances['wordWeightChart'] = new Chart(document.getElementById('wordWeightChart'), {
+    type:'bar', data:{ labels:topic.words, datasets:[{ label:'Weight', data:topic.weights, backgroundColor:'#6c8fff99', borderColor:'#6c8fff', borderWidth:1, borderRadius:3 }] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:axisStyle('Weight'), y:{ticks:{color:'#e2e8f0',font:{size:11}},grid:{color:'#2e3347'}} } }
+  });
 }
 
 function drawHeatmap(heatmap, topics, colors) {
   destroyChart('heatmapChart');
   const nWords = Math.min(10, heatmap.word_labels.length);
-
-  _chartInstances['heatmapChart'] = new Chart(
-    document.getElementById('heatmapChart'), {
-      type: 'bar',
-      data: {
-        labels: heatmap.word_labels.slice(0, nWords),
-        datasets: topics.map((t, i) => ({
-          label: t.label,
-          data: (heatmap.data[i] || []).slice(0, nWords),
-          backgroundColor: colors[i] + 'cc',
-          borderColor: colors[i],
-          borderWidth: 1
-        }))
-      },
-      options: {
-        plugins: {
-          legend: { labels: { color: '#e2e8f0', font: { size: 10 } } },
-          tooltip: {
-            callbacks: {
-              label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(4)}`
-            }
-          }
-        },
-        scales: {
-          x: {
-            ticks: { color: '#e2e8f0', font: { size: 10 } },
-            grid:  { color: '#2e3347' }
-          },
-          y: axisStyle('Word Weight')
-        }
-      }
-    }
-  );
+  _chartInstances['heatmapChart'] = new Chart(document.getElementById('heatmapChart'), {
+    type:'bar',
+    data:{ labels: heatmap.word_labels.slice(0,nWords), datasets: topics.map((t,i)=>({ label:t.label, data:(heatmap.data[i]||[]).slice(0,nWords), backgroundColor:colors[i]+'cc', borderColor:colors[i], borderWidth:1 })) },
+    options:{ plugins:{legend:{labels:{color:'#e2e8f0',font:{size:10}}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(4)}`}}}, scales:{ x:{ticks:{color:'#e2e8f0',font:{size:10}},grid:{color:'#2e3347'}}, y:axisStyle('Word Weight') } }
+  });
 }
 
 async function compareTopics() {
   document.getElementById('topicsLoading').classList.add('visible');
   document.getElementById('topicsCompareSection').style.display = 'none';
-
   try {
-    const res  = await fetch(`${API}/topics/compare`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ n_range: [3, 5, 7, 10] })
-    });
+    const res  = await fetch(`${API}/topics/compare`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ n_range:[3,5,7,10] }) });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-
-    // Perplexity line
     destroyChart('perplexityChart');
-    _chartInstances['perplexityChart'] = new Chart(
-      document.getElementById('perplexityChart'), {
-        type: 'line',
-        data: {
-          labels: data.n_values,
-          datasets: [{
-            label: 'Perplexity',
-            data: data.perplexity_values,
-            borderColor: '#f87171',
-            backgroundColor: '#f8717122',
-            fill: true, tension: 0.3,
-            pointBackgroundColor: '#f87171', pointRadius: 6
-          }]
-        },
-        options: {
-          plugins: { legend: { labels: { color: '#e2e8f0' } } },
-          scales: {
-            x: axisStyle('عدد الـ Topics'),
-            y: axisStyle('Perplexity (أقل = أفضل)')
-          }
-        }
-      }
-    );
-
-    // Coherence bar
-    const maxIdx = data.coherence_values.indexOf(
-      Math.max(...data.coherence_values)
-    );
+    _chartInstances['perplexityChart'] = new Chart(document.getElementById('perplexityChart'), {
+      type:'line', data:{ labels:data.n_values, datasets:[{ label:'Perplexity', data:data.perplexity_values, borderColor:'#f87171', backgroundColor:'#f8717122', fill:true, tension:0.3, pointBackgroundColor:'#f87171', pointRadius:6 }] },
+      options:{ plugins:{legend:{labels:{color:'#e2e8f0'}}}, scales:{ x:axisStyle('عدد الـ Topics'), y:axisStyle('Perplexity') } }
+    });
+    const maxIdx = data.coherence_values.indexOf(Math.max(...data.coherence_values));
     destroyChart('coherenceChart');
-    _chartInstances['coherenceChart'] = new Chart(
-      document.getElementById('coherenceChart'), {
-        type: 'bar',
-        data: {
-          labels: data.n_values,
-          datasets: [{
-            label: 'Coherence Score',
-            data: data.coherence_values,
-            backgroundColor: data.n_values.map((_,i) =>
-              i === maxIdx ? '#34d399' : '#a78bfa'
-            ),
-            borderRadius: 4
-          }]
-        },
-        options: {
-          plugins: { legend: { labels: { color: '#e2e8f0' } } },
-          scales: {
-            x: axisStyle('عدد الـ Topics'),
-            y: axisStyle('Coherence (أعلى = أفضل)')
-          }
-        }
-      }
-    );
-
+    _chartInstances['coherenceChart'] = new Chart(document.getElementById('coherenceChart'), {
+      type:'bar', data:{ labels:data.n_values, datasets:[{ label:'Coherence Score', data:data.coherence_values, backgroundColor:data.n_values.map((_,i)=>i===maxIdx?'#34d399':'#a78bfa'), borderRadius:4 }] },
+      options:{ plugins:{legend:{labels:{color:'#e2e8f0'}}}, scales:{ x:axisStyle('عدد الـ Topics'), y:axisStyle('Coherence') } }
+    });
     document.getElementById('topicsCompareSection').style.display = 'block';
-  } catch(e) {
-    alert('خطأ: ' + e.message);
-  } finally {
-    document.getElementById('topicsLoading').classList.remove('visible');
-  }
+  } catch(e) { alert('خطأ: ' + e.message); }
+  finally { document.getElementById('topicsLoading').classList.remove('visible'); }
 }
 </script>
 </body>

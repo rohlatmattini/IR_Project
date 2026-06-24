@@ -9,7 +9,7 @@ load_dotenv()
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 
-def generate_answer(query: str, retrieved_docs: list, max_docs: int = 5) -> dict:
+def generate_answer(query: str, retrieved_docs: list, max_docs: int = 5, language: str = "en") -> dict:
     if not GROQ_API_KEY:
         return {
             "success": False,
@@ -25,9 +25,21 @@ def generate_answer(query: str, retrieved_docs: list, max_docs: int = 5) -> dict
 
     context = "\n\n".join(context_parts)
 
+    if language == "ar":
+        lang_rule = (
+            "مهم جداً: الوثائق المرفقة بالأسفل مكتوبة بالإنكليزية، وهذا طبيعي. "
+            "لكن يجب أن يكون ردك بالكامل باللغة العربية الفصحى السليمة فقط، بدون أي كلمة أو حرف من لغة أخرى "
+            "(ممنوع الإنكليزية، الصينية، الفيتنامية أو أي لغة غير العربية)، إلا إذا كان هناك مصطلح تقني "
+            "لا يوجد له مرادف عربي شائع، فاكتبه بالعربية مع وضع المصطلح الإنكليزي بين قوسين إذا لزم."
+        )
+    else:
+        lang_rule = "Respond entirely in clear English only."
+
     prompt = f"""You are an intelligent assistant for an Information Retrieval system.
 Based ONLY on the following retrieved documents, answer the user's question clearly and concisely.
 If the documents don't contain enough information, say so honestly.
+
+{lang_rule}
 
 Retrieved Documents:
 {context}
@@ -46,7 +58,19 @@ Provide a clear, direct answer. Cite documents used by their number [1], [2], et
             json={
                 "model": "llama-3.3-70b-versatile",
                 "max_tokens": 1000,
-                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "أنت مساعد يلتزم حرفياً بتعليمات اللغة المطلوبة. "
+                            "لا تخلط بين لغات مختلفة في إجابتك أبداً."
+                            if language == "ar"
+                            else "You strictly follow the requested language instruction and never mix languages."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
             },
             timeout=30,
         )

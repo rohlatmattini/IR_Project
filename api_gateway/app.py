@@ -98,6 +98,10 @@ def search():
             extra_params["fusion_method"] = data.get(
                 "fusion_method", config.HYBRID["fusion_method"]
             )
+            if "tfidf_weight" in data:
+                extra_params["tfidf_weight"]     = float(data["tfidf_weight"])
+                extra_params["bm25_weight"]       = float(data["bm25_weight"])
+                extra_params["embedding_weight"]  = float(data["embedding_weight"])
 
         result = SearchService.search_and_rank(
             query=search_query,
@@ -251,10 +255,14 @@ def rag_search():
     if not query:
         return jsonify({"error": "Query is empty"}), 400
 
+    from services.query_refinement_service.refiner import detect_language, translate_to_english
+    lang = detect_language(query)
+    search_query = translate_to_english(query) if lang == "ar" else query
+
     try:
         from services.search_service.searcher import SearchService
         search_result = SearchService.search_and_rank(
-            query=query,
+            query=search_query,
             dataset_key=dataset,
             model_type=model_type,
             top_k_display=5,
@@ -266,17 +274,17 @@ def rag_search():
     _append_history(query)
 
     from services.rag_service.rag import generate_answer
-    rag_result = generate_answer(query, ranked)
+    rag_result = generate_answer(query, ranked, language=lang)
 
     return jsonify({
         "query":          query,
+        "search_query":   search_query,   # مفيد تعرضه بالـ UI تحت إشارة "تمت الترجمة إلى"
         "dataset":        dataset,
         "model":          model_type,
         "retrieved_docs": ranked,
         "rag_answer":     rag_result.get("answer"),
         "rag_success":    rag_result.get("success"),
     })
-
 # ===================================================
 #  TOPIC MODELING
 # ===================================================

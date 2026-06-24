@@ -1,84 +1,154 @@
-
 import os
 import sys
+import pickle
+
+from rank_bm25 import BM25Okapi
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from services.preprocessing_service.preprocessor import preprocess_text
-from services.indexing_service.indexer import get_index, InvertedIndex
 import config
 
 
 class BM25Model:
     """
-    BM25 يعتمد كلياً على الـ Inverted Index.
-    ما عاد يخزن posting_list خاص فيه.
+    BM25 باستخدام مكتبة rank_bm25 (BM25Okapi).
+    يُبنى من الـ InvertedIndex لاستخدام نفس التوكنات المُعالجة مسبقاً.
     """
 
-    def __init__(self, k1: float = None, b: float = None, index: InvertedIndex = None):
+    def __init__(self, k1: float = None, b: float = None):
         self.k1 = k1 or config.BM25_PARAMS["k1"]
         self.b = b or config.BM25_PARAMS["b"]
-        self.index = index
-        self.is_fitted = index is not None
+        self.bm25 = None
+        self.doc_ids = []
+        self.is_fitted = False
 
-    def fit(self, index: InvertedIndex = None):
-        """BM25 ما عنده تدريب فعلي. بس بياخد reference للفهرس."""
-        if index is not None:
-            self.index = index
-        if self.index is None:
-            raise ValueError("BM25 needs an InvertedIndex instance!")
-        self.is_fitted = True
-        print(f"[BM25] ✅ Connected to InvertedIndex ({self.index.doc_count} docs, k1={self.k1}, b={self.b})")
+    def fit(self, documents: list):
+        """
+        يبني نموذج BM25Okapi من قائمة الوثائق.
+        documents: list of {"doc_id": str, "text": str}
+        """
+        print(f"[BM25] Building BM25Okapi for {len(documents)} documents...")
+        tokenized_corpus = []
+        self.doc_ids = []
 
-    def _score(self, query_tokens: list, doc_id: str) -> float:
-        """يحسب BM25 score لوثيقة واحدة"""
-        doc_len = self.index.get_doc_length(doc_id)
-        avg_len = self.index.avg_doc_length
-
-        score = 0.0
-        for term in query_tokens:
-            postings = self.index.get_postings(term)
-            tf = postings.get(doc_id, 0)
-            if tf == 0:
+        for i, doc in enumerate(documents):
+            if isinstance(doc, str):
+                doc_id = f"doc_{i}"
+                text = doc
+            elif isinstance(doc, dict):
+                doc_id = str(doc.get("doc_id") or doc.get("id") or f"doc_{i}")
+                text = str(doc.get("text", doc.get("body", "")))
+            else:
                 continue
-            idf = self.index.get_idf(term, variant="bm25")
-            numerator = tf * (self.k1 + 1)
-            denominator = tf + self.k1 * (1 - self.b + self.b * doc_len / avg_len)
-            score += idf * (numerator / denominator)
-        return score
+
+            tokens = preprocess_text(text, return_tokens=True)
+            self.doc_ids.append(doc_id)
+            tokenized_corpus.append(tokens)
+
+        self.bm25 = BM25Okapi(tokenized_corpus, k1=self.k1, b=self.b)
+        self.is_fitted = True
+        print(f"[BM25] ✅ BM25Okapi ready — {len(self.doc_ids)} documents (k1={self.k1}, b={self.b})")
 
     def search(self, query: str, top_k: int = None, k1: float = None, b: float = None) -> list:
-        """يبحث ويرجع أفضل top_k وثائق باستخدام الفهرس"""
-        if not self.is_fitted:
-            raise RuntimeError("BM25 not connected to index.")
+        """
+        يرجع: قائمة (doc_id, score) مرتبة تنازلياً
+        """
+        if not self.is_fitted or self.bm25 is None:
+            raise RuntimeError("[BM25] Model not fitted. Call fit() first.")
 
-        if k1 is not None:
+        # إذا تغيّرت المعاملات نعيد البناء (نادراً لكن ممكن من الـ UI)
+        if k1 is not None and k1 != self.k1:
             self.k1 = k1
-        if b is not None:
+            self.bm25.k1 = k1
+        if b is not None and b != self.b:
             self.b = b
+            self.bm25.b = b
 
         top_k = top_k or config.RETRIEVAL["top_k"]
         query_tokens = preprocess_text(query, return_tokens=True)
 
-        # استرجاع الوثائق المرشحة من الفهرس
-        candidate_ids = self.index.get_candidates_for_query(query_tokens)
+        scores = self.bm25.get_scores(query_tokens)
 
-        scores = []
-        for doc_id in candidate_ids:
-            s = self._score(query_tokens, doc_id)
-            if s > 0:
-                scores.append((doc_id, s))
+        # نرتب ونأخذ أعلى top_k مع فلترة الصفريات
+        ranked = sorted(
+            ((self.doc_ids[i], float(scores[i])) for i in range(len(self.doc_ids)) if scores[i] > 0),
+            key=lambda x: x[1],
+            reverse=True,
+        )
+        return ranked[:top_k]
 
-        scores.sort(key=lambda x: x[1], reverse=True)
-        return scores[:top_k]
+    def save(self, path: str):
+        if not self.is_fitted:
+            print("[BM25] ⚠️ Save skipped — model not fitted.")
+            return
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            pickle.dump(
+                {
+                    "bm25": self.bm25,
+                    "doc_ids": self.doc_ids,
+                    "k1": self.k1,
+                    "b": self.b,
+                },
+                f,
+            )
+        print(f"[BM25] 💾 Saved to {path}")
+
+    def load(self, path: str):
+        with open(path, "rb") as f:
+            data = pickle.load(f)
+        self.bm25 = data["bm25"]
+        self.doc_ids = data["doc_ids"]
+        self.k1 = data.get("k1", self.k1)
+        self.b = data.get("b", self.b)
+        self.is_fitted = True
+        print(f"[BM25] 📂 Loaded from {path} — {len(self.doc_ids)} documents")
+
+
+def _load_documents(docs_path: str) -> list:
+    import json
+    with open(docs_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    normalized = []
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if isinstance(v, dict):
+                normalized.append({"doc_id": str(v.get("doc_id", k)), "text": str(v.get("text", v.get("body", "")))})
+            else:
+                normalized.append({"doc_id": str(k), "text": str(v)})
+    elif isinstance(data, list):
+        for i, item in enumerate(data):
+            if isinstance(item, dict):
+                doc_id = str(item.get("doc_id") or item.get("id") or f"doc_{i}")
+                text = str(item.get("text", item.get("body", "")))
+                normalized.append({"doc_id": doc_id, "text": text})
+            else:
+                normalized.append({"doc_id": str(i), "text": str(item)})
+    return normalized
 
 
 def get_bm25_model(dataset_key: str = "dataset2", k1: float = None, b: float = None) -> BM25Model:
     """
-    يرجع BM25 جاهز ومتصل بالفهرس.
+    يحمّل النموذج من الكاش إذا وجد، وإلا يبنيه ويحفظه.
     """
-    index = get_index(dataset_key)
-    model = BM25Model(k1=k1, b=b, index=index)
-    model.fit()
+    index_dir = config.INDEX2_DIR
+    model_path = os.path.join(index_dir, "bm25_model.pkl")
+
+    model = BM25Model(k1=k1, b=b)
+
+    if os.path.exists(model_path) and os.path.getsize(model_path) > 0:
+        try:
+            model.load(model_path)
+            if model.bm25 is not None and len(model.doc_ids) > 0:
+                return model
+            print("[BM25] ⚠️ Cached file invalid, rebuilding...")
+        except Exception as e:
+            print(f"[BM25] Load error: {e}, rebuilding...")
+
+    documents = _load_documents(config.DATASET2_DOCS)
+    model.fit(documents)
+    model.save(model_path)
     return model
 
 
