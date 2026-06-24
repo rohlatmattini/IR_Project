@@ -54,9 +54,7 @@ def compute_coherence(
     matrix,
     n_top_words: int = 10
 ) -> float:
-    """
-    Coherence Score مبسّط (PMI-based على الـ co-occurrence)
-    """
+   
     # حساب co-occurrence matrix
     doc_term = (matrix > 0).astype(int)
     n_docs = matrix.shape[0]
@@ -76,11 +74,9 @@ def compute_coherence(
                 wi = top_word_indices[i]
                 wj = top_word_indices[j]
                 
-                # عدد الوثائق التي تحتوي wi و wj معاً
                 co_occur = float(
                     doc_term[:, wi].multiply(doc_term[:, wj]).sum()
                 )
-                # عدد الوثائق التي تحتوي wj
                 wj_count = float(doc_term[:, wj].sum())
                 
                 if co_occur > 0 and wj_count > 0:
@@ -97,9 +93,7 @@ def compute_coherence(
 
 
 def get_topic_distribution(lda_model, matrix, doc_ids: list) -> list:
-    """
-    توزيع الـ topics على كل وثيقة
-    """
+
     doc_topic_matrix = lda_model.transform(matrix)
     
     distributions = []
@@ -122,12 +116,9 @@ def run_lda(
     use_cache: bool = True,
     force_recompute: bool = False
 ) -> dict:
-    """
-    الدالة الرئيسية: LDA + تقييم شامل
-    """
+   
     cache_key = f"lda_{n_topics}"
     
-    # تحقق من الـ cache
     if use_cache and not force_recompute and os.path.exists(CACHE_PATH):
         try:
             with open(CACHE_PATH, "rb") as f:
@@ -141,11 +132,9 @@ def run_lda(
     docs = load_documents()
     doc_ids = [d["doc_id"] for d in docs]
     
-    # بناء المصفوفة
     matrix, vectorizer = build_count_matrix(docs)
     feature_names = vectorizer.get_feature_names_out().tolist()
     
-    # تشغيل LDA
     print(f"[TopicModeling] Training LDA with {n_topics} topics...")
     lda = LatentDirichletAllocation(
         n_components=n_topics,
@@ -159,7 +148,6 @@ def run_lda(
     lda.fit(matrix)
     print(f"[TopicModeling] ✅ LDA trained. Perplexity={lda.perplexity(matrix):.2f}")
     
-    # استخراج الـ topics
     n_top_words = 10
     topics = []
     for topic_idx, topic in enumerate(lda.components_):
@@ -174,7 +162,6 @@ def run_lda(
             "weights": top_weights
         })
     
-    # توزيع الـ topics
     distributions, doc_topic_matrix = get_topic_distribution(lda, matrix, doc_ids)
     
     # Coherence Score
@@ -185,7 +172,6 @@ def run_lda(
     # Perplexity
     perplexity = round(float(lda.perplexity(matrix)), 2)
     
-    # حساب حجم كل topic (عدد الوثائق الغالبة فيه)
     dominant_topics = [d["dominant_topic"] for d in distributions]
     topic_sizes = {}
     for t in dominant_topics:
@@ -213,7 +199,6 @@ def run_lda(
             "word_labels": topics[0]["words"] if topics else [],
             "data": heatmap_data
         },
-        # sample توزيع (أول 100 وثيقة)
         "sample_distributions": [
             {
                 "doc_id": d["doc_id"],
@@ -224,7 +209,6 @@ def run_lda(
         ]
     }
     
-    # حفظ في cache
     try:
         with open(CACHE_PATH, "wb") as f:
             pickle.dump({"cache_key": cache_key, "data": result}, f)

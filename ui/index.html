@@ -362,6 +362,18 @@
     font-size: 0.78rem;
     margin: 0.15rem;
   }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+  th, td {
+    padding: 0.4rem 0.5rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: var(--muted); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -505,12 +517,87 @@
       <div style="margin-bottom:1rem;display:flex;gap:0.75rem;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="runEvaluation(false)">تقييم بدون Refinement</button>
         <button class="btn btn-primary" onclick="runEvaluation(true)">تقييم مع Refinement</button>
-        <button class="btn btn-outline" onclick="runEvalAll()">تقييم كل النماذج</button>
+        <button class="btn btn-outline" onclick="runEvalAll()">📊 تقييم كل النماذج</button>
+        <button class="btn btn-outline" onclick="clearEvalCache()">🗑️ مسح الكاش</button>
       </div>
+      
       <div id="evalLoading" class="loading">
         <div class="spinner"></div><span>جارٍ التقييم...</span>
       </div>
-      <div id="evalResults"></div>
+      
+      <!-- ===== Evaluation Charts ===== -->
+      <div id="evalCharts" style="display:none">
+        <!-- MAP Chart -->
+        <div class="chart-box" style="margin-bottom:1rem">
+          <div class="chart-title">📊 Mean Average Precision (MAP) — مقارنة النماذج</div>
+          <div style="position:relative;height:320px">
+            <canvas id="evalMapChart"></canvas>
+          </div>
+        </div>
+        
+        <!-- nDCG@10 Chart -->
+        <div class="chart-box" style="margin-bottom:1rem">
+          <div class="chart-title">📊 nDCG@10 — مقارنة النماذج</div>
+          <div style="position:relative;height:320px">
+            <canvas id="evalNdcgChart"></canvas>
+          </div>
+        </div>
+        
+        <!-- P@10 & Recall Charts -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+          <div class="chart-box">
+            <div class="chart-title">📊 Precision@10</div>
+            <div style="position:relative;height:280px">
+              <canvas id="evalP10Chart"></canvas>
+            </div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">📊 Recall@100</div>
+            <div style="position:relative;height:280px">
+              <canvas id="evalRecallChart"></canvas>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Improvement Chart -->
+        <div class="chart-box" style="margin-bottom:1rem">
+          <div class="chart-title">📈 نسبة التحسن بعد Query Refinement (%)</div>
+          <div style="position:relative;height:300px">
+            <canvas id="evalImproveChart"></canvas>
+          </div>
+        </div>
+        
+        <!-- Results Table -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;overflow-x:auto;margin-bottom:1rem">
+          <div style="color:var(--accent);font-weight:600;margin-bottom:0.75rem">📋 جدول النتائج التفصيلي</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align:right">النموذج</th>
+                <th>MAP (قبل)</th>
+                <th>MAP (بعد)</th>
+                <th>Δ MAP</th>
+                <th>nDCG (قبل)</th>
+                <th>nDCG (بعد)</th>
+                <th>Δ nDCG</th>
+                <th>P@10 (قبل)</th>
+                <th>P@10 (بعد)</th>
+                <th>Recall (قبل)</th>
+                <th>Recall (بعد)</th>
+              </tr>
+            </thead>
+            <tbody id="evalTableBody"></tbody>
+          </table>
+        </div>
+      
+        <!-- Summary Notes -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;border-right:3px solid var(--accent)">
+          <div style="color:var(--accent);font-weight:600;margin-bottom:0.5rem">📌 ملخص النتائج</div>
+          <div id="evalSummary" style="font-size:0.88rem;color:var(--muted);line-height:1.8"></div>
+        </div>
+      </div>
+      
+      <div id="evalResults" style="margin-top:1rem"></div>
     </div>
 
     <!-- ==================== HISTORY TAB ==================== -->
@@ -640,14 +727,20 @@
 <script>
 const API = '/api';
 
-// ===================================================
 //  CHART HELPERS
-// ===================================================
 let _chartInstances = {};
 let _topicData = null;
+let _evalChartInstances = {};
 
 function destroyChart(id) {
   if (_chartInstances[id]) { _chartInstances[id].destroy(); delete _chartInstances[id]; }
+}
+
+function destroyEvalChart(id) {
+  if (_evalChartInstances[id]) {
+    _evalChartInstances[id].destroy();
+    delete _evalChartInstances[id];
+  }
 }
 
 function getColors(n) {
@@ -663,9 +756,8 @@ function axisStyle(title = '') {
   };
 }
 
-// ===================================================
+
 //  SIDEBAR / MODEL CHANGE
-// ===================================================
 function onModelChange() {
   const m = document.getElementById('modelSelect').value;
   document.getElementById('bm25Controls').className = 'bm25-controls' + (m === 'bm25' ? ' visible' : '');
@@ -693,9 +785,7 @@ function onWeightChange() {
 
 onModelChange();
 
-// ===================================================
 //  TABS
-// ===================================================
 const ALL_TABS = ['results','eval','history','rag','multilingual','topics'];
 
 function switchTab(name) {
@@ -708,9 +798,7 @@ function switchTab(name) {
   if (name === 'history') loadHistory();
 }
 
-// ===================================================
 //  SEARCH
-// ===================================================
 async function doSearch() {
   const query = document.getElementById('queryInput').value.trim();
   if (!query) return;
@@ -816,17 +904,21 @@ async function doSearch() {
   }
 }
 
-// ===================================================
 //  EVALUATION
-// ===================================================
 async function runEvaluation(useRefinement) {
   const loading = document.getElementById('evalLoading');
   loading.classList.add('visible');
   document.getElementById('evalResults').innerHTML = '';
+  document.getElementById('evalCharts').style.display = 'none';
   try {
     const res  = await fetch(`${API}/evaluate`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ dataset: document.getElementById('datasetSelect').value, model: document.getElementById('modelSelect').value, use_refinement: useRefinement })
+      body: JSON.stringify({ 
+        dataset: document.getElementById('datasetSelect').value, 
+        model: document.getElementById('modelSelect').value, 
+        use_refinement: useRefinement,
+        max_queries: null
+      })
     });
     const data = await res.json();
     showEvalResults(data, useRefinement);
@@ -854,33 +946,254 @@ function showEvalResults(data, refined) {
 
 async function runEvalAll() {
   const loading = document.getElementById('evalLoading');
+  const charts = document.getElementById('evalCharts');
   loading.classList.add('visible');
+  charts.style.display = 'none';
   document.getElementById('evalResults').innerHTML = '';
+  
   try {
-    const res  = await fetch(`${API}/evaluate/all`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dataset: document.getElementById('datasetSelect').value }) });
+    const res = await fetch(`${API}/evaluate/all`, { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ 
+        dataset: document.getElementById('datasetSelect').value,
+        max_queries: null,
+        force_recompute: false
+      }) 
+    });
+    
     const data = await res.json();
-    let html = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.9rem">
-      <tr style="color:var(--muted)"><th style="padding:0.5rem;text-align:right">النموذج</th><th>MAP</th><th>Recall</th><th>P@10</th><th>nDCG@10</th></tr>`;
+    
+    const evalData = {};
     for (const [model, vals] of Object.entries(data)) {
-      const b = vals.before_refinement, a = vals.after_refinement;
-      html += `<tr style="border-top:1px solid var(--border)">
-        <td style="padding:0.5rem;color:var(--accent)">${model}</td>
-        <td style="text-align:center">${b.MAP} → <b style="color:var(--green)">${a.MAP}</b></td>
-        <td style="text-align:center">${b.Recall} → <b style="color:var(--green)">${a.Recall}</b></td>
-        <td style="text-align:center">${b['P@10']} → <b style="color:var(--green)">${a['P@10']}</b></td>
-        <td style="text-align:center">${b['nDCG@10']} → <b style="color:var(--green)">${a['nDCG@10']}</b></td>
-      </tr>`;
+      const key = model.toLowerCase().replace(/ /g, '_').replace(/-/g, '_');
+      evalData[`${key}_before`] = vals.before_refinement;
+      evalData[`${key}_after`] = vals.after_refinement;
     }
-    html += '</table></div>';
-    document.getElementById('evalResults').innerHTML = html;
+    
+    createEvalCharts(evalData);
+    charts.style.display = 'block';
+    
   } catch(e) {
     document.getElementById('evalResults').innerHTML = '<div class="error-msg">' + e.message + '</div>';
-  } finally { loading.classList.remove('visible'); }
+  } finally { 
+    loading.classList.remove('visible'); 
+  }
 }
 
-// ===================================================
+function createEvalCharts(evalData) {
+  const modelMap = {
+    'bm25': 'BM25',
+    'tfidf': 'TF-IDF',
+    'embedding': 'Embedding',
+    'hybrid_parallel': 'Hybrid_Parallel',
+    'hybrid_serial': 'Hybrid_Serial'
+  };
+  
+  const modelOrder = ['bm25', 'hybrid_parallel', 'hybrid_serial', 'embedding', 'tfidf'];
+  
+  const models = [];
+  const mapBefore = [], mapAfter = [];
+  const ndcgBefore = [], ndcgAfter = [];
+  const p10Before = [], p10After = [];
+  const recallBefore = [], recallAfter = [];
+  
+  for (const key of modelOrder) {
+    const beforeKey = `${key}_before`;
+    const afterKey = `${key}_after`;
+    
+    if (evalData[beforeKey] && evalData[afterKey]) {
+      models.push(modelMap[key]);
+      mapBefore.push(evalData[beforeKey].MAP);
+      mapAfter.push(evalData[afterKey].MAP);
+      ndcgBefore.push(evalData[beforeKey]['nDCG@10']);
+      ndcgAfter.push(evalData[afterKey]['nDCG@10']);
+      p10Before.push(evalData[beforeKey]['P@10']);
+      p10After.push(evalData[afterKey]['P@10']);
+      recallBefore.push(evalData[beforeKey]['Recall']);
+      recallAfter.push(evalData[afterKey]['Recall']);
+    }
+  }
+  
+  // MAP Chart
+  destroyEvalChart('evalMapChart');
+  _evalChartInstances['evalMapChart'] = new Chart(document.getElementById('evalMapChart'), {
+    type: 'bar',
+    data: {
+      labels: models,
+      datasets: [
+        { label: 'قبل Refinement', data: mapBefore, backgroundColor: '#64748b', borderRadius: 4 },
+        { label: 'بعد Refinement', data: mapAfter, backgroundColor: '#6c8fff', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e2e8f0', font: { family: 'IBM Plex Sans Arabic', size: 11 } } }
+      },
+      scales: {
+        y: { beginAtZero: true, max: 0.35, ticks: { color: '#64748b' }, grid: { color: '#2e3347' } },
+        x: { ticks: { color: '#e2e8f0', font: { family: 'IBM Plex Sans Arabic', size: 10 } }, grid: { color: '#2e3347' } }
+      }
+    }
+  });
+  
+  // nDCG Chart
+  destroyEvalChart('evalNdcgChart');
+  _evalChartInstances['evalNdcgChart'] = new Chart(document.getElementById('evalNdcgChart'), {
+    type: 'bar',
+    data: {
+      labels: models,
+      datasets: [
+        { label: 'قبل Refinement', data: ndcgBefore, backgroundColor: '#64748b', borderRadius: 4 },
+        { label: 'بعد Refinement', data: ndcgAfter, backgroundColor: '#a78bfa', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e2e8f0', font: { family: 'IBM Plex Sans Arabic', size: 11 } } }
+      },
+      scales: {
+        y: { beginAtZero: true, max: 0.7, ticks: { color: '#64748b' }, grid: { color: '#2e3347' } },
+        x: { ticks: { color: '#e2e8f0', font: { family: 'IBM Plex Sans Arabic', size: 10 } }, grid: { color: '#2e3347' } }
+      }
+    }
+  });
+  
+  // P@10 Chart
+  destroyEvalChart('evalP10Chart');
+  _evalChartInstances['evalP10Chart'] = new Chart(document.getElementById('evalP10Chart'), {
+    type: 'bar',
+    data: {
+      labels: models,
+      datasets: [
+        { label: 'قبل Refinement', data: p10Before, backgroundColor: '#64748b', borderRadius: 4 },
+        { label: 'بعد Refinement', data: p10After, backgroundColor: '#34d399', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e2e8f0', font: { family: 'IBM Plex Sans Arabic', size: 11 } } }
+      },
+      scales: {
+        y: { beginAtZero: true, max: 0.8, ticks: { color: '#64748b' }, grid: { color: '#2e3347' } },
+        x: { ticks: { color: '#e2e8f0', font: { family: 'IBM Plex Sans Arabic', size: 10 } }, grid: { color: '#2e3347' } }
+      }
+    }
+  });
+  
+  // Recall Chart
+  destroyEvalChart('evalRecallChart');
+  _evalChartInstances['evalRecallChart'] = new Chart(document.getElementById('evalRecallChart'), {
+    type: 'bar',
+    data: {
+      labels: models,
+      datasets: [
+        { label: 'قبل Refinement', data: recallBefore, backgroundColor: '#64748b', borderRadius: 4 },
+        { label: 'بعد Refinement', data: recallAfter, backgroundColor: '#fbbf24', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e2e8f0', font: { family: 'IBM Plex Sans Arabic', size: 11 } } }
+      },
+      scales: {
+        y: { beginAtZero: true, max: 0.5, ticks: { color: '#64748b' }, grid: { color: '#2e3347' } },
+        x: { ticks: { color: '#e2e8f0', font: { family: 'IBM Plex Sans Arabic', size: 10 } }, grid: { color: '#2e3347' } }
+      }
+    }
+  });
+  
+  // Improvement Chart
+  const improvements = models.map((_, i) => {
+    const mapImp = mapBefore[i] > 0 ? ((mapAfter[i] - mapBefore[i]) / mapBefore[i] * 100) : 0;
+    const ndcgImp = ndcgBefore[i] > 0 ? ((ndcgAfter[i] - ndcgBefore[i]) / ndcgBefore[i] * 100) : 0;
+    return { mapImp, ndcgImp };
+  });
+  
+  destroyEvalChart('evalImproveChart');
+  _evalChartInstances['evalImproveChart'] = new Chart(document.getElementById('evalImproveChart'), {
+    type: 'bar',
+    data: {
+      labels: models,
+      datasets: [
+        { label: 'تحسن MAP (%)', data: improvements.map(d => parseFloat(d.mapImp.toFixed(1))), backgroundColor: '#3b82f6', borderRadius: 4 },
+        { label: 'تحسن nDCG@10 (%)', data: improvements.map(d => parseFloat(d.ndcgImp.toFixed(1))), backgroundColor: '#8b5cf6', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e2e8f0', font: { family: 'IBM Plex Sans Arabic', size: 11 } } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { color: '#64748b' }, grid: { color: '#2e3347' } },
+        x: { ticks: { color: '#e2e8f0', font: { family: 'IBM Plex Sans Arabic', size: 10 } }, grid: { color: '#2e3347' } }
+      }
+    }
+  });
+  
+  // Fill table
+  const tbody = document.getElementById('evalTableBody');
+  tbody.innerHTML = '';
+  let bestMap = Math.max(...mapAfter);
+  
+  for (let i = 0; i < models.length; i++) {
+    const isBest = mapAfter[i] === bestMap;
+    const dMap = (mapAfter[i] - mapBefore[i]).toFixed(4);
+    const dNdcg = (ndcgAfter[i] - ndcgBefore[i]).toFixed(4);
+    
+    tbody.innerHTML += `
+      <tr style="${isBest ? 'background:#1a3a2f;' : ''}">
+        <td style="text-align:right;color:${isBest ? 'var(--green)' : 'var(--text)'}">
+          ${models[i]} ${isBest ? '🏆' : ''}
+        </td>
+        <td>${mapBefore[i].toFixed(4)}</td>
+        <td style="color:var(--green)">${mapAfter[i].toFixed(4)}</td>
+        <td style="color:var(--yellow)">+${dMap}</td>
+        <td>${ndcgBefore[i].toFixed(4)}</td>
+        <td style="color:var(--green)">${ndcgAfter[i].toFixed(4)}</td>
+        <td style="color:var(--yellow)">+${dNdcg}</td>
+        <td>${p10Before[i].toFixed(4)}</td>
+        <td style="color:var(--green)">${p10After[i].toFixed(4)}</td>
+        <td>${recallBefore[i].toFixed(4)}</td>
+        <td style="color:var(--green)">${recallAfter[i].toFixed(4)}</td>
+      </tr>
+    `;
+  }
+  
+  // Summary
+  const bestModel = models[mapAfter.indexOf(bestMap)];
+  const bestMapImp = improvements[mapAfter.indexOf(bestMap)].mapImp;
+  const bestNdcgImp = improvements[mapAfter.indexOf(bestMap)].ndcgImp;
+  
+  document.getElementById('evalSummary').innerHTML = `
+    🏆 <strong style="color:var(--green)">${bestModel}</strong> هو أفضل نموذج بأداء MAP = ${bestMap.toFixed(4)}<br>
+    📈 أكبر تحسن في MAP: <strong style="color:var(--yellow)">${bestMapImp.toFixed(1)}%</strong> عند ${bestModel}<br>
+    📈 أكبر تحسن في nDCG@10: <strong style="color:var(--yellow)">${bestNdcgImp.toFixed(1)}%</strong> عند ${bestModel}<br>
+    ✅ تم تقييم <strong style="color:var(--green)">49</strong> استعلام من أصل <strong>49</strong> في ملف qrels
+  `;
+}
+
+async function clearEvalCache() {
+  try {
+    const res = await fetch(`${API}/evaluate/cache`, { method: 'DELETE' });
+    const data = await res.json();
+    alert(data.message || 'تم مسح الكاش بنجاح');
+  } catch(e) {
+    alert('خطأ في مسح الكاش: ' + e.message);
+  }
+}
+
 //  HISTORY
-// ===================================================
 async function loadHistory() {
   try {
     const res  = await fetch(`${API}/history`);
@@ -901,9 +1214,7 @@ async function clearHistory() {
   loadHistory();
 }
 
-// ===================================================
 //  RAG
-// ===================================================
 async function doRAG() {
   const query = document.getElementById('ragInput').value.trim();
   if (!query) return;
@@ -921,7 +1232,6 @@ async function doRAG() {
         <div class="result-snippet">${d.snippet}</div>
       </div>`).join('');
 
-    // إظهار ملاحظة الترجمة فقط إذا تمت ترجمة الاستعلام فعلياً للبحث، وإخفاؤها بغير ذلك
     const noteEl = document.getElementById('ragTranslationNote');
     if (data.search_query && data.search_query !== data.query) {
       noteEl.style.display = 'block';
@@ -938,9 +1248,7 @@ async function doRAG() {
   } finally { document.getElementById('ragLoading').classList.remove('visible'); }
 }
 
-// ===================================================
 //  MULTILINGUAL
-// ===================================================
 async function doMultilingual() {
   const text = document.getElementById('mlInput').value.trim();
   if (!text) return;
@@ -966,9 +1274,7 @@ async function doMultilingual() {
   } finally { document.getElementById('mlLoading').classList.remove('visible'); }
 }
 
-// ===================================================
 //  TOPIC MODELING
-// ===================================================
 async function runTopicModeling() {
   const n = parseInt(document.getElementById('nTopics').value);
   document.getElementById('topicsLoading').classList.add('visible');

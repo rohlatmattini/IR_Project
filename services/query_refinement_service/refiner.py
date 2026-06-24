@@ -2,7 +2,6 @@ import os
 import sys
 import warnings
 
-# sys.stdout.reconfigure(encoding="utf-8")
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -57,8 +56,7 @@ def get_synonyms(word: str, topn: int = 3) -> list:
 
 
 def expand_with_synonyms(query: str) -> str:
-    """يضيف مرادفات فقط للكلمات المفيدة (طولها > 4 ومش stopwords)"""
-    # كلمات لا نأخذ لها مرادفات
+
     SKIP_WORDS = {
         "should",
         "would",
@@ -100,7 +98,6 @@ def expand_with_synonyms(query: str) -> str:
     topn = config.QUERY_REFINEMENT["synonym_topn"]
 
     for word in words:
-        # نأخذ مرادفات فقط للكلمات المهمة
         if len(word) > 4 and word.lower() not in SKIP_WORDS:
             syns = get_synonyms(word, topn=topn)
             expanded.extend(syns)
@@ -168,7 +165,6 @@ def translate_to_english(text: str) -> str:
     return result
 
 
-# ضيف هاد الكود تحت دالة translate_to_english مباشرة، قبل دالة refine_query
 
 
 def detect_and_translate(text: str) -> dict:

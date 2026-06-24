@@ -41,8 +41,8 @@ class InvertedIndex:
             tokens = preprocess_text(text, return_tokens=True)
             self.doc_ids.append(doc_id)
             self.doc_lengths[doc_id] = len(tokens)
-            self.doc_texts[doc_id] = text          # ← جديد
-            self.doc_tokens[doc_id] = tokens       # ← جديد
+            self.doc_texts[doc_id] = text          
+            self.doc_tokens[doc_id] = tokens       
             total_length += len(tokens)
 
             term_freq = defaultdict(int)
@@ -60,11 +60,9 @@ class InvertedIndex:
 
    
     def get_postings(self, term: str) -> dict:
-        """يرجع {doc_id: tf} للمصطلح المعطى"""
         return self.index.get(term, {})
 
     def get_df(self, term: str) -> int:
-        """Document Frequency لمصطلح"""
         return self.df.get(term, 0)
 
     def get_idf(self, term: str, variant: str = "bm25") -> float:
@@ -92,7 +90,6 @@ class InvertedIndex:
         return candidates
 
     def get_all_terms(self) -> list:
-        """كل المصطلحات في الفهرس"""
         return list(self.index.keys())
     
     def save(self, path: str):

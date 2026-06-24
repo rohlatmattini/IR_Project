@@ -5,9 +5,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 import config
 
 
-# ===================================================
-#  MongoDB helper
-# ===================================================
 def _fetch_full_texts(doc_ids: list, dataset_key: str = "dataset2") -> dict:
     result = {doc_id: "" for doc_id in doc_ids}
     try:
@@ -36,9 +33,6 @@ def _fetch_full_texts(doc_ids: list, dataset_key: str = "dataset2") -> dict:
             print(f"[SearchService] ⚠️ JSON fallback also failed: {e2}")
     return result
 
-# ===================================================
-#  SearchService
-# ===================================================
 class SearchService:
     _models_cache = {}
 
@@ -100,14 +94,14 @@ class SearchService:
 
         elif model_type == "bm25":
             k1 = kwargs.get("bm25_k1")
-            b  = kwargs.get("bm25_b")
+            b = kwargs.get("bm25_b")
             raw_results = model.search(query, top_k=top_k, k1=k1, b=b)
 
         elif model_type == "embedding":
             raw_results = model.search(query, top_k=top_k)
 
         elif model_type == "hybrid_parallel":
-            fusion  = kwargs.get("fusion_method", config.HYBRID["fusion_method"])
+            fusion = kwargs.get("fusion_method", config.HYBRID["fusion_method"])
             weights = None
             if "tfidf_weight" in kwargs:
                 weights = [
@@ -123,9 +117,9 @@ class SearchService:
             raw_results = model.search_serial(query, top_k=top_k)
 
         return {
-            "query":       query,
-            "model":       model_type,
-            "dataset":     dataset_key,
+            "query": query,
+            "model": model_type,
+            "dataset": dataset_key,
             "raw_results": raw_results,
             "total_found": len(raw_results),
         }
@@ -141,7 +135,6 @@ class SearchService:
     ) -> dict:
         top_k_display = top_k_display or config.RETRIEVAL["top_k_display"]
 
-        # خطوة 1: استرجاع أولي
         search_result = cls.search(
             query=query,
             dataset_key=dataset_key,
@@ -150,7 +143,6 @@ class SearchService:
             **kwargs,
         )
 
-        # خطوة 2: ترتيب وإثراء النتائج
         from services.ranking_service.ranker import rank_and_enrich
 
         ranked = rank_and_enrich(
@@ -160,21 +152,20 @@ class SearchService:
             query=query,
         )
 
-        # خطوة 3: جلب النص الكامل من MongoDB
-        doc_ids    = [str(r["doc_id"]) for r in ranked]
+        doc_ids = [str(r["doc_id"]) for r in ranked]
         full_texts = _fetch_full_texts(doc_ids, dataset_key)
         for r in ranked:
-            full_text      = full_texts.get(str(r["doc_id"]), "")
+            full_text = full_texts.get(str(r["doc_id"]), "")
             r["full_text"] = full_text
             if not r.get("snippet") and full_text:
                 r["snippet"] = (full_text[:300] + "...") if len(full_text) > 300 else full_text
 
         return {
-            "query":         query,
-            "model":         model_type,
-            "dataset":       dataset_key,
+            "query": query,
+            "model": model_type,
+            "dataset": dataset_key,
             "total_results": len(ranked),
-            "results":       ranked,
+            "results": ranked,
         }
 
     @classmethod

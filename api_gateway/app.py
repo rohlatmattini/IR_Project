@@ -49,18 +49,14 @@ def _append_history(query: str):
 _search_history = _load_history()
 
 
-# ===================================================
 #  STATIC
-# ===================================================
 @app.route("/")
 def index():
     ui_folder = os.path.join(os.path.dirname(__file__), "..", "ui")
     return send_from_directory(ui_folder, "index.html")
 
 
-# ===================================================
 #  SEARCH
-# ===================================================
 @app.route("/api/search", methods=["POST"])
 def search():
     data = request.json
@@ -122,9 +118,7 @@ def search():
         return jsonify({"error": f"Search failed: {str(e)}"}), 500
 
 
-# ===================================================
 #  EVALUATION
-# ===================================================
 @app.route("/api/evaluate", methods=["POST"])
 def evaluate():
     data       = request.json
@@ -191,9 +185,7 @@ def clear_eval_cache():
     return jsonify({"message": f"Cleared {count} cached results"})
 
 
-# ===================================================
 #  DATASETS / HEALTH
-# ===================================================
 @app.route("/api/datasets", methods=["GET"])
 def get_datasets():
     from services.search_service.searcher import SearchService
@@ -210,9 +202,7 @@ def health():
     return jsonify({"status": "ok", "message": "IR System is running"})
 
 
-# ===================================================
 #  MULTILINGUAL
-# ===================================================
 @app.route("/api/multilingual/translate", methods=["POST"])
 def multilingual_translate():
     data = request.json
@@ -227,9 +217,7 @@ def multilingual_translate():
         return jsonify({"error": f"Translation failed: {str(e)}"}), 500
 
 
-# ===================================================
 #  HISTORY
-# ===================================================
 @app.route("/api/history", methods=["GET"])
 def get_history():
     return jsonify({"history": _search_history[-20:]})
@@ -242,9 +230,7 @@ def clear_history():
     return jsonify({"message": "History cleared successfully"})
 
 
-# ===================================================
 #  RAG
-# ===================================================
 @app.route("/api/rag", methods=["POST"])
 def rag_search():
     data       = request.json
@@ -278,16 +264,15 @@ def rag_search():
 
     return jsonify({
         "query":          query,
-        "search_query":   search_query,   # مفيد تعرضه بالـ UI تحت إشارة "تمت الترجمة إلى"
+        "search_query":   search_query,   
         "dataset":        dataset,
         "model":          model_type,
         "retrieved_docs": ranked,
         "rag_answer":     rag_result.get("answer"),
         "rag_success":    rag_result.get("success"),
     })
-# ===================================================
+
 #  TOPIC MODELING
-# ===================================================
 @app.route("/api/topics/run", methods=["POST"])
 def run_topics():
     data            = request.json or {}
@@ -325,9 +310,7 @@ def compare_topics():
         return jsonify({"error": str(e)}), 500
 
 
-# ===================================================
 #  MAIN
-# ===================================================
 if __name__ == "__main__":
     print("🚀 Running IR System API on http://localhost:5000")
     print("📊 Architecture: SOA with Search Service as Facade")

@@ -18,10 +18,10 @@ class EmbeddingModel:
     def __init__(self, model_name: str = None):
         self.model_name = model_name or config.EMBEDDING["model_name"]
         self.model = None
-        self.doc_embeddings = None  # مصفوفة (num_docs × embedding_dim)
+        self.doc_embeddings = None  
         self.doc_ids = []
         self.is_fitted = False
-        self.faiss_index = None  # ⭐ FAISS index للبحث السريع
+        self.faiss_index = None  
 
     def _load_model(self):
         if self.model is None:
@@ -62,16 +62,13 @@ class EmbeddingModel:
         print(f"[Embedding] ✅ Model ready — matrix shape: {self.doc_embeddings.shape}")
 
     def _build_faiss_index(self):
-        """⭐ يبني FAISS index من doc_embeddings الحالية (IndexFlatIP = cosine بعد normalize)"""
         embeddings = np.array(self.doc_embeddings, dtype="float32")
         self.faiss_index = faiss.IndexFlatIP(embeddings.shape[1])
         self.faiss_index.add(embeddings)
         print(f"[Embedding] 🔎 FAISS index built — {self.faiss_index.ntotal} vectors")
 
     def search(self, query: str, top_k: int = None) -> list:
-        """
-        يرجع: قائمة (doc_id, score) مرتبة تنازلياً — باستخدام FAISS بدل cosine اليدوي
-        """
+       
         if (
             not self.is_fitted
             or self.doc_embeddings is None
@@ -79,7 +76,6 @@ class EmbeddingModel:
         ):
             raise RuntimeError("Model has not been fitted successfully or contains no documents.")
 
-        # ⭐ fallback: لو الموديل محمّل من ملف قديم بدون faiss_index، نبنيه الآن
         if self.faiss_index is None:
             self._build_faiss_index()
 
@@ -123,13 +119,11 @@ class EmbeddingModel:
         self.doc_ids = data["doc_ids"]
         self.model_name = data["model_name"]
         self.is_fitted = True
-        self._build_faiss_index()  # ⭐ نبني الـ FAISS index من جديد بعد التحميل
+        self._build_faiss_index()  
         print(f"[Embedding] 📂 Loaded from {path}")
 
 def load_documents_safely(docs_path: str) -> list:
-    """
-    تحميل الوثائق من ملف JSON بشكل مرن وآمن مهما كانت بنيته الأساسية.
-    """
+   
     with open(docs_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 

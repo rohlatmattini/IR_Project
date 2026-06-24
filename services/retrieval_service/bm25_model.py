@@ -10,10 +10,7 @@ import config
 
 
 class BM25Model:
-    """
-    BM25 باستخدام مكتبة rank_bm25 (BM25Okapi).
-    يُبنى من الـ InvertedIndex لاستخدام نفس التوكنات المُعالجة مسبقاً.
-    """
+  
 
     def __init__(self, k1: float = None, b: float = None):
         self.k1 = k1 or config.BM25_PARAMS["k1"]
@@ -23,10 +20,6 @@ class BM25Model:
         self.is_fitted = False
 
     def fit(self, documents: list):
-        """
-        يبني نموذج BM25Okapi من قائمة الوثائق.
-        documents: list of {"doc_id": str, "text": str}
-        """
         print(f"[BM25] Building BM25Okapi for {len(documents)} documents...")
         tokenized_corpus = []
         self.doc_ids = []
@@ -50,13 +43,10 @@ class BM25Model:
         print(f"[BM25] ✅ BM25Okapi ready — {len(self.doc_ids)} documents (k1={self.k1}, b={self.b})")
 
     def search(self, query: str, top_k: int = None, k1: float = None, b: float = None) -> list:
-        """
-        يرجع: قائمة (doc_id, score) مرتبة تنازلياً
-        """
+     
         if not self.is_fitted or self.bm25 is None:
             raise RuntimeError("[BM25] Model not fitted. Call fit() first.")
 
-        # إذا تغيّرت المعاملات نعيد البناء (نادراً لكن ممكن من الـ UI)
         if k1 is not None and k1 != self.k1:
             self.k1 = k1
             self.bm25.k1 = k1
@@ -69,7 +59,6 @@ class BM25Model:
 
         scores = self.bm25.get_scores(query_tokens)
 
-        # نرتب ونأخذ أعلى top_k مع فلترة الصفريات
         ranked = sorted(
             ((self.doc_ids[i], float(scores[i])) for i in range(len(self.doc_ids)) if scores[i] > 0),
             key=lambda x: x[1],
@@ -129,9 +118,6 @@ def _load_documents(docs_path: str) -> list:
 
 
 def get_bm25_model(dataset_key: str = "dataset2", k1: float = None, b: float = None) -> BM25Model:
-    """
-    يحمّل النموذج من الكاش إذا وجد، وإلا يبنيه ويحفظه.
-    """
     index_dir = config.INDEX2_DIR
     model_path = os.path.join(index_dir, "bm25_model.pkl")
 

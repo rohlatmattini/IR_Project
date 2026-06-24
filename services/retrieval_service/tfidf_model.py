@@ -49,7 +49,6 @@ class TFIDFModel:
 
         top_k = top_k or config.RETRIEVAL["top_k"]
 
-        # تأكد من أن هذه الأسطر تبدأ بـ 8 مسافات (مستوى واحد تحت تعريف الدالة)
         processed_query = preprocess_text(query)
         query_vec = self.vectorizer.transform([processed_query])
 
