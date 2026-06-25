@@ -137,7 +137,7 @@
   }
   .weight-sum-note.warn { color: var(--yellow); }
 
-  main { padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
+  main { padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; min-height: calc(100vh - 60px); }
 
   .search-box {
     display: flex;
@@ -374,6 +374,302 @@
     border-bottom: 1px solid var(--border);
   }
   th { color: var(--muted); font-weight: 600; }
+
+  /* RAG Chat */
+  .rag-chat-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .rag-chat {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: calc(100vh - 200px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .rag-chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .rag-chat-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .rag-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-height: 320px;
+  }
+
+  .rag-welcome {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+  }
+
+  .rag-welcome .welcome-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1.25rem;
+    opacity: 0.85;
+  }
+
+  .rag-welcome p {
+    max-width: 520px;
+    line-height: 1.8;
+    font-size: 0.95rem;
+  }
+
+  .rag-welcome .welcome-sub {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    opacity: 0.75;
+  }
+
+  .rag-msg {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+    animation: ragFadeIn 0.25s ease;
+  }
+
+  @keyframes ragFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .rag-msg.user {
+    align-self: flex-end;
+    align-items: flex-end;
+  }
+
+  .rag-msg.assistant {
+    align-self: flex-start;
+    align-items: flex-start;
+  }
+
+  .rag-msg-bubble {
+    padding: 0.85rem 1.1rem;
+    border-radius: 14px;
+    line-height: 1.75;
+    font-size: 0.92rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .rag-msg.user .rag-msg-bubble {
+    background: var(--accent);
+    color: #fff;
+    border-bottom-left-radius: 4px;
+  }
+
+  .rag-msg.assistant .rag-msg-bubble {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-bottom-right-radius: 4px;
+  }
+
+  .rag-msg-sources {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    max-width: 100%;
+  }
+
+  .rag-msg-sources details {
+    cursor: pointer;
+  }
+
+  .rag-msg-sources summary {
+    color: var(--accent);
+    list-style: none;
+  }
+
+  .rag-msg-sources .source-item {
+    margin-top: 0.35rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.76rem;
+  }
+
+  .rag-typing {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    color: var(--muted);
+    font-size: 0.88rem;
+    align-self: flex-start;
+  }
+
+  .rag-typing-dots span {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: var(--muted);
+    border-radius: 50%;
+    animation: ragDot 1.2s infinite;
+  }
+
+  .rag-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .rag-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes ragDot {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+
+  .rag-chat-input {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .rag-chat-input textarea {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    outline: none;
+    resize: none;
+    min-height: 48px;
+    max-height: 120px;
+    line-height: 1.5;
+    transition: border-color 0.2s;
+  }
+
+  .rag-chat-input textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .rag-chat-input textarea::placeholder {
+    color: var(--muted);
+  }
+
+  .rag-send-btn {
+    align-self: flex-end;
+    padding: 0.7rem 1.4rem;
+    border-radius: 12px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    white-space: nowrap;
+  }
+
+  .rag-send-btn:hover:not(:disabled) {
+    background: #5a7aff;
+    transform: translateY(-1px);
+  }
+
+  .rag-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  main.rag-active,
+  main.arch-active {
+    padding: 1rem 1.5rem 1.5rem;
+  }
+
+  main.rag-active .search-box,
+  main.arch-active .search-box {
+    display: none;
+  }
+
+  .layout.rag-active,
+  .layout.arch-active {
+    grid-template-columns: 1fr;
+  }
+
+  .layout.rag-active aside,
+  .layout.arch-active aside {
+    display: none;
+  }
+
+  #tab-architecture {
+    flex: 1;
+    min-height: 0;
+    display: none;
+    flex-direction: column;
+  }
+
+  .arch-frame-wrap {
+    flex: 1;
+    min-height: calc(100vh - 200px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .arch-frame-wrap iframe {
+    width: 100%;
+    height: 100%;
+    min-height: calc(100vh - 200px);
+    border: none;
+    display: block;
+    background: #f4f6fb;
+  }
+
+  .arch-tab-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .arch-tab-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .arch-tab-header span {
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
 </style>
 </head>
 <body>
@@ -495,6 +791,7 @@
       <button class="tab" onclick="switchTab('rag')">🤖 RAG</button>
       <button class="tab" onclick="switchTab('multilingual')">🌐 Multilingual</button>
       <button class="tab" onclick="switchTab('topics')">📚 Topic Modeling</button>
+      <button class="tab" onclick="switchTab('architecture')">🏗️ البنية</button>
     </div>
 
     <!-- ==================== RESULTS TAB ==================== -->
@@ -610,27 +907,31 @@
     </div>
 
     <!-- ==================== RAG TAB ==================== -->
-    <div id="tab-rag" style="display:none">
-      <div style="margin-bottom:1rem">
-        <p style="color:var(--muted);margin-bottom:0.75rem;font-size:0.9rem">
-          اكتب استعلامك (بالعربي أو الإنكليزي) وسيقوم النظام باسترجاع الوثائق وتوليد إجابة بالذكاء الاصطناعي بنفس لغة سؤالك
-        </p>
-        <div class="search-box">
-          <input type="text" id="ragInput" placeholder="اسأل سؤالاً مباشراً...">
-          <button class="btn btn-primary" onclick="doRAG()">🤖 Generate</button>
+    <div id="tab-rag" class="rag-chat-wrap" style="display:none">
+      <div class="rag-chat">
+        <div class="rag-chat-header">
+          <div class="rag-chat-title">
+            <span>🤖</span>
+            <span>RAG Chat – استرجاع + توليد إجابة (عربي/إنجليزي مع متابعة المحادثة)</span>
+          </div>
+          <button class="btn btn-outline" onclick="clearRagChat()" style="font-size:0.85rem;padding:0.45rem 0.9rem">
+            🗑️ محادثة جديدة
+          </button>
         </div>
-      </div>
-      <div id="ragLoading" class="loading">
-        <div class="spinner"></div><span>جارٍ التوليد...</span>
-      </div>
-      <div id="ragAnswer" style="display:none">
-        <div style="background:var(--surface2);border:1px solid var(--accent);border-radius:10px;padding:1.25rem;margin-bottom:1rem">
-          <div style="color:var(--accent);font-weight:600;margin-bottom:0.5rem">🤖 الإجابة المولّدة</div>
-          <div id="ragTranslationNote" style="display:none;color:var(--muted);font-size:0.8rem;margin-bottom:0.5rem"></div>
-          <div id="ragAnswerText" style="line-height:1.8;white-space:pre-wrap"></div>
+
+        <div class="rag-chat-messages" id="ragMessages">
+          <div class="rag-welcome" id="ragWelcome">
+            <div class="welcome-icon">💬</div>
+            <p>مرحباً! اسأل أي سؤال بالعربي أو الإنجليزي وسأسترجع الوثائق ثم أجيبك بنفس لغة سؤالك.</p>
+            <p class="welcome-sub">يمكنك متابعة المحادثة بأسئلة follow-up</p>
+          </div>
         </div>
-        <div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">📄 الوثائق المستخدمة:</div>
-        <div id="ragSources"></div>
+
+        <div class="rag-chat-input">
+          <textarea id="ragInput" rows="1" placeholder="...اكتب رسالتك هنا"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();doRAG();}"></textarea>
+          <button class="rag-send-btn" id="ragSendBtn" onclick="doRAG()">إرسال</button>
+        </div>
       </div>
     </div>
 
@@ -663,6 +964,17 @@
             <div id="mlTranslated" style="margin-top:0.3rem;color:var(--green)"></div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ==================== ARCHITECTURE TAB ==================== -->
+    <div id="tab-architecture">
+      <div class="arch-tab-header">
+        <h2>🏗️ مخطط بنية النظام — SOA Architecture</h2>
+        <span>الطلب 7 — Service Oriented Architecture</span>
+      </div>
+      <div class="arch-frame-wrap">
+        <iframe src="/ui/architecture.html" title="مخطط بنية النظام SOA"></iframe>
       </div>
     </div>
 
@@ -786,15 +1098,28 @@ function onWeightChange() {
 onModelChange();
 
 //  TABS
-const ALL_TABS = ['results','eval','history','rag','multilingual','topics'];
+const ALL_TABS = ['results','eval','history','rag','multilingual','topics','architecture'];
 
 function switchTab(name) {
   ALL_TABS.forEach(t => {
-    document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+    const el = document.getElementById('tab-' + t);
+    if (t === name) {
+      el.style.display = (t === 'rag' || t === 'architecture') ? 'flex' : 'block';
+    } else {
+      el.style.display = 'none';
+    }
   });
   document.querySelectorAll('.tab').forEach((btn, i) => {
     btn.classList.toggle('active', ALL_TABS[i] === name);
   });
+  const isRag = name === 'rag';
+  const isArch = name === 'architecture';
+  const mainEl = document.querySelector('main');
+  const layoutEl = document.querySelector('.layout');
+  mainEl.classList.toggle('rag-active', isRag);
+  layoutEl.classList.toggle('rag-active', isRag);
+  mainEl.classList.toggle('arch-active', isArch);
+  layoutEl.classList.toggle('arch-active', isArch);
   if (name === 'history') loadHistory();
 }
 
@@ -1214,38 +1539,136 @@ async function clearHistory() {
   loadHistory();
 }
 
-//  RAG
-async function doRAG() {
-  const query = document.getElementById('ragInput').value.trim();
-  if (!query) return;
-  document.getElementById('ragLoading').classList.add('visible');
-  document.getElementById('ragAnswer').style.display = 'none';
-  try {
-    const res  = await fetch(`${API}/rag`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ query, dataset: document.getElementById('datasetSelect').value, model: document.getElementById('modelSelect').value }) });
-    const data = await res.json();
+//  RAG CHAT
+let _ragHistory = [];
+let _ragSending = false;
 
-    document.getElementById('ragAnswerText').textContent = data.rag_answer || 'لم يتم توليد إجابة';
-    document.getElementById('ragSources').innerHTML = (data.retrieved_docs || []).map((d, i) => `
-      <div class="result-card" style="margin-bottom:0.5rem">
-        <span class="result-rank">#${i+1}</span>
-        <span style="margin-right:0.5rem;font-weight:600">${d.title||d.doc_id}</span>
-        <div class="result-snippet">${d.snippet}</div>
-      </div>`).join('');
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
 
-    const noteEl = document.getElementById('ragTranslationNote');
-    if (data.search_query && data.search_query !== data.query) {
-      noteEl.style.display = 'block';
-      noteEl.textContent = `🔤 تمت الترجمة للبحث: "${data.search_query}"`;
-    } else {
-      noteEl.style.display = 'none';
-      noteEl.textContent = '';
+function renderRagMessages() {
+  const container = document.getElementById('ragMessages');
+  const welcome = document.getElementById('ragWelcome');
+
+  if (!_ragHistory.length) {
+    welcome.style.display = 'flex';
+    container.querySelectorAll('.rag-msg, .rag-typing').forEach(el => el.remove());
+    return;
+  }
+
+  welcome.style.display = 'none';
+  container.querySelectorAll('.rag-msg, .rag-typing').forEach(el => el.remove());
+
+  _ragHistory.forEach(msg => {
+    const div = document.createElement('div');
+    div.className = 'rag-msg ' + msg.role;
+
+    let sourcesHtml = '';
+    if (msg.role === 'assistant' && msg.sources?.length) {
+      const items = msg.sources.map((d, i) =>
+        `<div class="source-item"><strong>#${i + 1}</strong> ${escapeHtml(d.title || d.doc_id)} — ${escapeHtml((d.snippet || '').slice(0, 120))}…</div>`
+      ).join('');
+      sourcesHtml = `<div class="rag-msg-sources"><details><summary>📄 ${msg.sources.length} وثائق مستخدمة</summary>${items}</details></div>`;
     }
 
-    document.getElementById('ragAnswer').style.display = 'block';
-  } catch(e) {
-    document.getElementById('ragAnswerText').textContent = 'خطأ: ' + e.message;
-    document.getElementById('ragAnswer').style.display = 'block';
-  } finally { document.getElementById('ragLoading').classList.remove('visible'); }
+    const noteHtml = msg.translationNote
+      ? `<div style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem">${escapeHtml(msg.translationNote)}</div>`
+      : '';
+
+    div.innerHTML = `
+      <div class="rag-msg-bubble">${escapeHtml(msg.content)}</div>
+      ${noteHtml}
+      ${sourcesHtml}`;
+    container.appendChild(div);
+  });
+
+  container.scrollTop = container.scrollHeight;
+}
+
+function showRagTyping(show) {
+  const container = document.getElementById('ragMessages');
+  let typing = document.getElementById('ragTyping');
+  if (show) {
+    if (!typing) {
+      typing = document.createElement('div');
+      typing.id = 'ragTyping';
+      typing.className = 'rag-typing';
+      typing.innerHTML = '<div class="rag-typing-dots"><span></span><span></span><span></span></div><span>جارٍ الاسترجاع والتوليد...</span>';
+      container.appendChild(typing);
+    }
+    document.getElementById('ragWelcome').style.display = 'none';
+    container.scrollTop = container.scrollHeight;
+  } else if (typing) {
+    typing.remove();
+  }
+}
+
+function clearRagChat() {
+  _ragHistory = [];
+  document.getElementById('ragInput').value = '';
+  renderRagMessages();
+}
+
+async function doRAG() {
+  if (_ragSending) return;
+  const input = document.getElementById('ragInput');
+  const query = input.value.trim();
+  if (!query) return;
+
+  _ragSending = true;
+  const sendBtn = document.getElementById('ragSendBtn');
+  sendBtn.disabled = true;
+
+  _ragHistory.push({ role: 'user', content: query });
+  input.value = '';
+  renderRagMessages();
+  showRagTyping(true);
+
+  const conversationHistory = _ragHistory
+    .slice(0, -1)
+    .map(m => ({ role: m.role, content: m.content }));
+
+  try {
+    const res = await fetch(`${API}/rag`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        dataset: document.getElementById('datasetSelect').value,
+        model: document.getElementById('modelSelect').value,
+        history: conversationHistory,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    let translationNote = '';
+    if (data.search_query && data.search_query !== data.query) {
+      translationNote = `🔤 تمت الترجمة للبحث: "${data.search_query}"`;
+    }
+
+    _ragHistory.push({
+      role: 'assistant',
+      content: data.rag_answer || 'لم يتم توليد إجابة',
+      sources: data.retrieved_docs || [],
+      translationNote,
+    });
+  } catch (e) {
+    _ragHistory.push({
+      role: 'assistant',
+      content: '❌ خطأ: ' + e.message,
+      sources: [],
+    });
+  } finally {
+    showRagTyping(false);
+    renderRagMessages();
+    _ragSending = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
 }
 
 //  MULTILINGUAL

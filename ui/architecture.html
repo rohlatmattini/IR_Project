@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مخطط بنية النظام — IR Project 2026</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'IBM Plex Sans Arabic', sans-serif;
+      background: #f4f6fb;
+      color: #1e293b;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+      padding: 2.5rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      color: #1d4ed8;
+      margin-bottom: 0.4rem;
+    }
+
+    header p {
+      color: #64748b;
+      font-size: 0.95rem;
+    }
+
+    .req-badge {
+      display: inline-block;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      padding: 0.35rem 1rem;
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+      font-weight: 600;
+    }
+
+    h2 {
+      font-size: 1.15rem;
+      color: #334155;
+      margin: 2rem 0 1rem;
+      padding-right: 0.75rem;
+      border-right: 4px solid #3b82f6;
+    }
+
+    .arch {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .layer {
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      position: relative;
+    }
+
+    .layer-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+      opacity: 0.85;
+    }
+
+    .layer-boxes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      justify-content: center;
+    }
+
+    .box {
+      border-radius: 10px;
+      padding: 0.65rem 1rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-align: center;
+      min-width: 140px;
+      border: 2px solid transparent;
+    }
+
+    .box small {
+      display: block;
+      font-weight: 400;
+      font-size: 0.72rem;
+      margin-top: 0.2rem;
+      opacity: 0.8;
+    }
+
+    .layer-ui       { background: #f0fdf4; border: 2px solid #86efac; }
+    .layer-ui .box  { background: #dcfce7; border-color: #4ade80; color: #166534; }
+
+    .layer-gw       { background: #eff6ff; border: 2px solid #93c5fd; }
+    .layer-gw .box  { background: #dbeafe; border-color: #60a5fa; color: #1e40af; }
+
+    .layer-svc      { background: #faf5ff; border: 2px solid #d8b4fe; }
+    .layer-svc .box { background: #f3e8ff; border-color: #c084fc; color: #6b21a8; }
+
+    .layer-ret      { background: #fff7ed; border: 2px solid #fdba74; }
+    .layer-ret .box { background: #ffedd5; border-color: #fb923c; color: #9a3412; }
+
+    .layer-data     { background: #f8fafc; border: 2px solid #cbd5e1; }
+    .layer-data .box{ background: #f1f5f9; border-color: #94a3b8; color: #334155; }
+
+    .arrow-down {
+      text-align: center;
+      color: #64748b;
+      font-size: 1.4rem;
+      line-height: 1;
+      margin: -0.2rem 0;
+    }
+
+    .arrow-label {
+      text-align: center;
+      font-size: 0.78rem;
+      color: #64748b;
+      margin: -0.3rem 0 0.2rem;
+    }
+
+    .flow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      padding: 1rem 0;
+    }
+
+    .flow-step {
+      background: #fff;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0.75rem 1.5rem;
+      text-align: center;
+      min-width: 320px;
+      max-width: 520px;
+      font-size: 0.9rem;
+    }
+
+    .flow-step strong { color: #1d4ed8; display: block; margin-bottom: 0.2rem; }
+    .flow-step span { color: #64748b; font-size: 0.82rem; }
+
+    .flow-arrow {
+      color: #3b82f6;
+      font-size: 1.3rem;
+      padding: 0.15rem 0;
+    }
+
+    .flow-step.highlight {
+      border-color: #3b82f6;
+      background: #eff6ff;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #f8fafc;
+      border-radius: 10px;
+      font-size: 0.82rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    .note {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      color: #92400e;
+    }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      .page { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>مخطط بنية نظام استرجاع المعلومات</h1>
+      <p>Information Retrieval System — Architecture Diagram (SOA)</p>
+      <div class="req-badge">الطلب رقم 7 + متطلبات التسليم (Architecture Diagram)</div>
+    </header>
+
+    <h2>1. البنية المعمارية SOA — طبقات النظام</h2>
+
+    <div class="arch">
+      <div class="layer layer-ui">
+        <div class="layer-title">طبقة العرض — Presentation Layer</div>
+        <div class="layer-boxes">
+          <div class="box">
+            Web UI
+            <small>ui/index.html — بحث، تقييم، RAG، Multilingual</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down">↓</div>
+      <div class="arrow-label">HTTP / REST API (JSON)</div>
+
+      <div class="layer layer-gw">
+        <div class="layer-title">بوابة الخدمات — API Gateway</div>
+        <div class="layer-boxes">
+          <div class="box">
+            API Gateway
+            <small>api_gateway/app.py — Flask</small>
+          </div>
+        </div>
+        <div style="margin-top:0.6rem;font-size:0.78rem;color:#475569;text-align:center">
+          /api/search &nbsp;|&nbsp; /api/evaluate &nbsp;|&nbsp; /api/rag &nbsp;|&nbsp; /api/history &nbsp;|&nbsp; /api/multilingual/translate
+        </div>
+      </div>
+
+      <div class="arrow-down">↓</div>
+      <div class="arrow-label">استدعاء الخدمات (Service Invocation — Python Modules)</div>
+
+      <div class="layer layer-svc">
+        <div class="layer-title">طبقة الخدمات — Service Layer</div>
+        <div class="layer-boxes">
+          <div class="box">
+            Query Refinement Service
+            <small>refiner.py — تصحيح، مرادفات، ترجمة</small>
+          </div>
+          <div class="box">
+            Search Service
+            <small>searcher.py — Facade / Orchestrator</small>
+          </div>
+          <div class="box">
+            Ranking Service
+            <small>ranker.py — ترتيب وإثراء النتائج</small>
+          </div>
+          <div class="box">
+            Evaluation Service
+            <small>evaluator.py — MAP, Recall, P@10, nDCG</small>
+          </div>
+          <div class="box">
+            RAG Service
+            <small>rag.py — توليد إجابة (Bonus)</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down">↓</div>
+
+      <div class="layer layer-ret">
+        <div class="layer-title">خدمات الاسترجاع — Retrieval Service (Sub-Services)</div>
+        <div class="layer-boxes">
+          <div class="box">
+            Preprocessing Service
+            <small>preprocessor.py</small>
+          </div>
+          <div class="box">
+            Indexing Service
+            <small>indexer.py — Inverted Index</small>
+          </div>
+          <div class="box">
+            TF-IDF Model
+            <small>tfidf_model.py — VSM</small>
+          </div>
+          <div class="box">
+            BM25 Model
+            <small>bm25_model.py</small>
+          </div>
+          <div class="box">
+            Embedding Model
+            <small>embedding_model.py — SBERT + FAISS</small>
+          </div>
+          <div class="box">
+            Hybrid Model
+            <small>hybrid_model.py — Serial / Parallel + Fusion</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down">↓</div>
+      <div class="arrow-label">قراءة / كتابة البيانات والفهارس</div>
+
+      <div class="layer layer-data">
+        <div class="layer-title">طبقة البيانات — Data Layer</div>
+        <div class="layer-boxes">
+          <div class="box">
+            Dataset (JSON)
+            <small>data/dataset2 — documents, queries, qrels</small>
+          </div>
+          <div class="box">
+            Indexes
+            <small>indexes/dataset2 — inverted_index.pkl</small>
+          </div>
+          <div class="box">
+            Models
+            <small>tfidf_model.pkl, embedding_model.pkl</small>
+          </div>
+          <div class="box">
+            MongoDB
+            <small>ir_project — documents (اختياري)</small>
+          </div>
+          <div class="box">
+            Search History
+            <small>search_history.json</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2>2. تدفق عملية البحث — Search Flow</h2>
+
+    <div class="flow">
+      <div class="flow-step">
+        <strong>1. المستخدم</strong>
+        <span>يكتب استعلاماً ويختار Dataset + Model من الواجهة</span>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step highlight">
+        <strong>2. API Gateway</strong>
+        <span>POST /api/search — يستقبل query, model, bm25_k1, fusion_method...</span>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <strong>3. Query Refinement Service</strong>
+        <span>(اختياري) تصحيح إملائي → مرادفات → إثراء من السجل → ترجمة عربي</span>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step highlight">
+        <strong>4. Search Service (Facade)</strong>
+        <span>يختار النموذج المناسب وينسّق الاسترجاع</span>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <strong>5. Retrieval Service</strong>
+        <span>TF-IDF | BM25 | Embedding | Hybrid Serial | Hybrid Parallel (RRF/Linear)</span>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <strong>6. Preprocessing + Indexing</strong>
+        <span>معالجة الاستعلام + استخدام Inverted Index / FAISS / TF-IDF Matrix</span>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <strong>7. Ranking Service</strong>
+        <span>ترتيب النتائج + جلب النص الأصلي من MongoDB أو JSON</span>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step highlight">
+        <strong>8. API Gateway → Web UI</strong>
+        <span>إرجاع JSON: results, scores, snippets, full_text</span>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="dot" style="background:#4ade80"></div> Presentation Layer</div>
+      <div class="legend-item"><div class="dot" style="background:#60a5fa"></div> API Gateway</div>
+      <div class="legend-item"><div class="dot" style="background:#c084fc"></div> Core Services</div>
+      <div class="legend-item"><div class="dot" style="background:#fb923c"></div> Retrieval Sub-Services</div>
+      <div class="legend-item"><div class="dot" style="background:#94a3b8"></div> Data Layer</div>
+    </div>
+  </div>
+</body>
+</html>

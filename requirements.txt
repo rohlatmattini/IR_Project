@@ -1,0 +1,16 @@
+flask
+flask-cors
+pymongo
+nltk
+rank-bm25
+scikit-learn
+numpy
+sentence-transformers
+faiss-cpu
+tqdm
+python-dotenv
+requests
+pyspellchecker
+transformers
+torch
+ir-datasets

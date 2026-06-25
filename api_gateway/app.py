@@ -49,11 +49,51 @@ def _append_history(query: str):
 _search_history = _load_history()
 
 
+def _expand_rag_search_query(query: str, history: list) -> str:
+    """Expand vague follow-up queries (e.g. 'against it?') using prior turns."""
+    if not history:
+        return query
+
+    q = query.strip()
+    q_lower = q.lower()
+    vague_markers = (
+        " it", " it?", " they", " them", " this", " that",
+        " these", " those", " against it", " for it", " about it",
+        " main arguments", " what about",
+    )
+    is_short = len(q.split()) <= 12
+    is_vague = is_short and any(m in f" {q_lower}" for m in vague_markers)
+    if not is_vague:
+        return q
+
+    last_user = ""
+    for msg in reversed(history):
+        if msg.get("role") == "user":
+            last_user = (msg.get("content") or "").strip()
+            break
+
+    if last_user:
+        return f"{last_user} — {q}"
+    return q
+
+
 #  STATIC
+_UI_FOLDER = os.path.join(os.path.dirname(__file__), "..", "ui")
+
+
 @app.route("/")
 def index():
-    ui_folder = os.path.join(os.path.dirname(__file__), "..", "ui")
-    return send_from_directory(ui_folder, "index.html")
+    return send_from_directory(_UI_FOLDER, "index.html")
+
+
+@app.route("/architecture")
+def architecture():
+    return send_from_directory(_UI_FOLDER, "architecture.html")
+
+
+@app.route("/ui/<path:filename>")
+def ui_static(filename):
+    return send_from_directory(_UI_FOLDER, filename)
 
 
 #  SEARCH
@@ -237,6 +277,7 @@ def rag_search():
     query      = data.get("query", "").strip()
     dataset    = data.get("dataset", "dataset2")
     model_type = data.get("model", "bm25")
+    history    = data.get("history", [])
 
     if not query:
         return jsonify({"error": "Query is empty"}), 400
@@ -244,6 +285,7 @@ def rag_search():
     from services.query_refinement_service.refiner import detect_language, translate_to_english
     lang = detect_language(query)
     search_query = translate_to_english(query) if lang == "ar" else query
+    search_query = _expand_rag_search_query(search_query, history)
 
     try:
         from services.search_service.searcher import SearchService
@@ -260,7 +302,7 @@ def rag_search():
     _append_history(query)
 
     from services.rag_service.rag import generate_answer
-    rag_result = generate_answer(query, ranked, language=lang)
+    rag_result = generate_answer(query, ranked, language=lang, history=history)
 
     return jsonify({
         "query":          query,

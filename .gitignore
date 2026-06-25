@@ -11,3 +11,6 @@ pycache/
 venv/
 .venv/
 .env/
+.env
+api_gateway/search_history.json
+services/evaluation_service/eval_cache/

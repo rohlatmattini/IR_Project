@@ -4,12 +4,13 @@ from dotenv import load_dotenv
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-load_dotenv()
+_PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
+load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 
-def generate_answer(query: str, retrieved_docs: list, max_docs: int = 5, language: str = "en") -> dict:
+def generate_answer(query: str, retrieved_docs: list, max_docs: int = 5, language: str = "en", history: list = None) -> dict:
     if not GROQ_API_KEY:
         return {
             "success": False,
@@ -25,6 +26,19 @@ def generate_answer(query: str, retrieved_docs: list, max_docs: int = 5, languag
 
     context = "\n\n".join(context_parts)
 
+    history_block = ""
+    if history:
+        turns = []
+        for msg in history[-6:]:
+            role = msg.get("role", "")
+            content = (msg.get("content") or "").strip()
+            if not content:
+                continue
+            label = "المستخدم" if role == "user" else "المساعد"
+            turns.append(f"{label}: {content}")
+        if turns:
+            history_block = "Previous conversation:\n" + "\n".join(turns) + "\n\n"
+
     if language == "ar":
         lang_rule = (
             "مهم جداً: الوثائق المرفقة بالأسفل مكتوبة بالإنكليزية، وهذا طبيعي. "
@@ -38,10 +52,11 @@ def generate_answer(query: str, retrieved_docs: list, max_docs: int = 5, languag
     prompt = f"""You are an intelligent assistant for an Information Retrieval system.
 Based ONLY on the following retrieved documents, answer the user's question clearly and concisely.
 If the documents don't contain enough information, say so honestly.
+Use the previous conversation for context when the user asks follow-up questions.
 
 {lang_rule}
 
-Retrieved Documents:
+{history_block}Retrieved Documents:
 {context}
 
 User Question: {query}
