@@ -77,13 +77,14 @@ def dcg(retrieved, relevance_scores, k):
     score = 0.0
     for i, d in enumerate(retrieved[:k], start=1):
         rel = relevance_scores.get(d, 0)
-        rel = max(rel, 0)  
+        rel = max(rel, 0)  # تجاهل القيم السالبة
         score += rel / math.log2(i + 1)
     return score
 
 
 def ndcg(retrieved, relevance_scores, k=10):
     actual = dcg(retrieved, relevance_scores, k)
+    # تجاهل الـ relevance السالبة عند بناء الـ ideal
     positive_rels = {d: r for d, r in relevance_scores.items() if r > 0}
     ideal_ranking = sorted(positive_rels.keys(), key=lambda d: positive_rels[d], reverse=True)
     ideal = dcg(ideal_ranking, positive_rels, k)
@@ -124,7 +125,7 @@ def _normalize_qrels(qrels_data):
                 q_id = str(item.get("query_id") or item.get("id") or item.get("q_id", ""))
                 d_id = str(item.get("doc_id") or item.get("document_id") or item.get("d_id", ""))
                 score = int(item.get("relevance") or item.get("score", 1))
-                if q_id and d_id and score > 0:  
+                if q_id and d_id and score > 0:  # ⭐ فقط الإيجابية
                     if q_id not in normalized:
                         normalized[q_id] = {}
                     normalized[q_id][d_id] = score
@@ -144,7 +145,7 @@ def evaluate_model(
     search_fn,
     dataset_key="dataset2",
     use_refinement=False,
-    max_queries=None,  
+    max_queries=None,  # ⭐ صار None = كل الكويريات
     model_name=None,
     use_cache=True,
 ):
@@ -170,6 +171,7 @@ def evaluate_model(
         raw_qrels = json.load(f)
     qrels = _normalize_qrels(raw_qrels)
 
+    # ⭐ معلومات التشخيص
     print(f"\n{'='*60}")
     print(f"📊 EVALUATION DETAILS")
     print(f"{'='*60}")
@@ -180,6 +182,7 @@ def evaluate_model(
     print(f"   Qrels file:           {len(raw_qrels) if isinstance(raw_qrels, list) else 'dict'} entries")
     print(f"   Unique q_ids in qrels:{len(qrels)}")
 
+    # ⭐ نأخذ كل الـ query_ids الموجودة في qrels
     query_ids_to_eval = list(qrels.keys())
     if max_queries is not None and max_queries > 0:
         query_ids_to_eval = query_ids_to_eval[:max_queries]

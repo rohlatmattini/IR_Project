@@ -50,7 +50,6 @@ _search_history = _load_history()
 
 
 def _expand_rag_search_query(query: str, history: list) -> str:
-    """Expand vague follow-up queries (e.g. 'against it?') using prior turns."""
     if not history:
         return query
 
@@ -306,13 +305,14 @@ def rag_search():
 
     return jsonify({
         "query":          query,
-        "search_query":   search_query,   
+        "search_query":   search_query,
         "dataset":        dataset,
         "model":          model_type,
         "retrieved_docs": ranked,
         "rag_answer":     rag_result.get("answer"),
         "rag_success":    rag_result.get("success"),
     })
+
 
 #  TOPIC MODELING
 @app.route("/api/topics/run", methods=["POST"])

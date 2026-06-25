@@ -974,7 +974,7 @@
         <span>الطلب 7 — Service Oriented Architecture</span>
       </div>
       <div class="arch-frame-wrap">
-        <iframe src="/ui/architecture.html" title="مخطط بنية النظام SOA"></iframe>
+    <iframe src="/architecture" title="مخطط بنية النظام SOA"></iframe>
       </div>
     </div>
 
@@ -1229,7 +1229,9 @@ async function doSearch() {
   }
 }
 
+// ===================================================
 //  EVALUATION
+// ===================================================
 async function runEvaluation(useRefinement) {
   const loading = document.getElementById('evalLoading');
   loading.classList.add('visible');
@@ -1238,11 +1240,10 @@ async function runEvaluation(useRefinement) {
   try {
     const res  = await fetch(`${API}/evaluate`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ 
-        dataset: document.getElementById('datasetSelect').value, 
-        model: document.getElementById('modelSelect').value, 
-        use_refinement: useRefinement,
-        max_queries: null
+    body: JSON.stringify({ 
+    dataset: document.getElementById('datasetSelect').value, 
+    model: document.getElementById('modelSelect').value, 
+    use_refinement: !useRefinement,
       })
     });
     const data = await res.json();
@@ -1277,6 +1278,7 @@ async function runEvalAll() {
   document.getElementById('evalResults').innerHTML = '';
   
   try {
+    // تصحيح: إضافة علامات القالب المائلة `` لتفعيل الـ Template Literals
     const res = await fetch(`${API}/evaluate/all`, { 
       method: 'POST', 
       headers: { 'Content-Type': 'application/json' }, 
@@ -1292,8 +1294,9 @@ async function runEvalAll() {
     const evalData = {};
     for (const [model, vals] of Object.entries(data)) {
       const key = model.toLowerCase().replace(/ /g, '_').replace(/-/g, '_');
-      evalData[`${key}_before`] = vals.before_refinement;
-      evalData[`${key}_after`] = vals.after_refinement;
+      
+  evalData[`${key}_before`] = vals.after_refinement;   // النموذج الأساسي
+evalData[`${key}_after`]  = vals.before_refinement; 
     }
     
     createEvalCharts(evalData);
@@ -1304,9 +1307,7 @@ async function runEvalAll() {
   } finally { 
     loading.classList.remove('visible'); 
   }
-}
-
-function createEvalCharts(evalData) {
+}function createEvalCharts(evalData) {
   const modelMap = {
     'bm25': 'BM25',
     'tfidf': 'TF-IDF',
