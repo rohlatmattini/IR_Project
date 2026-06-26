@@ -56,9 +56,19 @@ def _expand_rag_search_query(query: str, history: list) -> str:
     q = query.strip()
     q_lower = q.lower()
     vague_markers = (
-        " it", " it?", " they", " them", " this", " that",
-        " these", " those", " against it", " for it", " about it",
-        " main arguments", " what about",
+        " it",
+        " it?",
+        " they",
+        " them",
+        " this",
+        " that",
+        " these",
+        " those",
+        " against it",
+        " for it",
+        " about it",
+        " main arguments",
+        " what about",
     )
     is_short = len(q.split()) <= 12
     is_vague = is_short and any(m in f" {q_lower}" for m in vague_markers)
@@ -99,20 +109,21 @@ def ui_static(filename):
 @app.route("/api/search", methods=["POST"])
 def search():
     data = request.json
-    query      = data.get("query", "").strip()
-    dataset    = data.get("dataset", "dataset2")
+    query = data.get("query", "").strip()
+    dataset = data.get("dataset", "dataset2")
     model_type = data.get("model", "bm25")
-    top_k      = int(data.get("top_k", config.RETRIEVAL["top_k_display"]))
+    top_k = int(data.get("top_k", config.RETRIEVAL["top_k_display"]))
     use_refine = data.get("use_refinement", False)
 
     if not query:
         return jsonify({"error": "Query is empty"}), 400
 
     refinement_info = None
-    search_query    = query
+    search_query = query
     if use_refine:
         from services.query_refinement_service.refiner import refine_query
-        refined      = refine_query(query, history=_search_history)
+
+        refined = refine_query(query, history=_search_history)
         search_query = refined["refined_query"]
         refinement_info = refined
 
@@ -126,17 +137,15 @@ def search():
             extra_params["bm25_k1"] = float(
                 data.get("bm25_k1", config.BM25_PARAMS["k1"])
             )
-            extra_params["bm25_b"] = float(
-                data.get("bm25_b", config.BM25_PARAMS["b"])
-            )
+            extra_params["bm25_b"] = float(data.get("bm25_b", config.BM25_PARAMS["b"]))
         elif model_type == "hybrid_parallel":
             extra_params["fusion_method"] = data.get(
                 "fusion_method", config.HYBRID["fusion_method"]
             )
             if "tfidf_weight" in data:
-                extra_params["tfidf_weight"]     = float(data["tfidf_weight"])
-                extra_params["bm25_weight"]       = float(data["bm25_weight"])
-                extra_params["embedding_weight"]  = float(data["embedding_weight"])
+                extra_params["tfidf_weight"] = float(data["tfidf_weight"])
+                extra_params["bm25_weight"] = float(data["bm25_weight"])
+                extra_params["embedding_weight"] = float(data["embedding_weight"])
 
         result = SearchService.search_and_rank(
             query=search_query,
@@ -146,9 +155,9 @@ def search():
             **extra_params,
         )
 
-        result["refined_query"]    = search_query if use_refine else None
-        result["refinement_info"]  = refinement_info
-        result["query"]            = query
+        result["refined_query"] = search_query if use_refine else None
+        result["refinement_info"] = refinement_info
+        result["query"] = query
         return jsonify(result)
 
     except ValueError as e:
@@ -160,10 +169,10 @@ def search():
 #  EVALUATION
 @app.route("/api/evaluate", methods=["POST"])
 def evaluate():
-    data       = request.json
-    dataset    = data.get("dataset", "dataset2")
+    data = request.json
+    dataset = data.get("dataset", "dataset2")
     model_type = data.get("model", "bm25")
-    max_q      = data.get("max_queries", None)
+    max_q = data.get("max_queries", None)
     if max_q is not None:
         try:
             max_q = int(max_q)
@@ -171,10 +180,11 @@ def evaluate():
                 max_q = None
         except (ValueError, TypeError):
             max_q = None
-    use_refine      = data.get("use_refinement", False)
+    use_refine = data.get("use_refinement", False)
     force_recompute = data.get("force_recompute", False)
 
     from services.search_service.searcher import SearchService
+
     model = SearchService._get_model(dataset, model_type)
 
     if model_type == "hybrid_parallel":
@@ -185,6 +195,7 @@ def evaluate():
         search_fn = model.search
 
     from services.evaluation_service.evaluator import evaluate_model
+
     results = evaluate_model(
         search_fn,
         dataset,
@@ -198,8 +209,8 @@ def evaluate():
 
 @app.route("/api/evaluate/all", methods=["POST"])
 def evaluate_all():
-    data        = request.json
-    dataset     = data.get("dataset", "dataset2")
+    data = request.json
+    dataset = data.get("dataset", "dataset2")
     max_queries = data.get("max_queries", None)
     if max_queries is not None:
         try:
@@ -211,6 +222,7 @@ def evaluate_all():
     force_recompute = data.get("force_recompute", False)
 
     from services.evaluation_service.evaluator import evaluate_all_models
+
     results = evaluate_all_models(
         dataset, max_queries=max_queries, use_cache=not force_recompute
     )
@@ -220,6 +232,7 @@ def evaluate_all():
 @app.route("/api/evaluate/cache", methods=["DELETE"])
 def clear_eval_cache():
     from services.evaluation_service.evaluator import clear_cache
+
     count = clear_cache()
     return jsonify({"message": f"Cleared {count} cached results"})
 
@@ -228,12 +241,15 @@ def clear_eval_cache():
 @app.route("/api/datasets", methods=["GET"])
 def get_datasets():
     from services.search_service.searcher import SearchService
-    return jsonify({
-        "datasets": [
-            {"key": "dataset2", "name": config.DATASET_NAMES["dataset2"]},
-        ],
-        "models": SearchService.get_supported_models(),
-    })
+
+    return jsonify(
+        {
+            "datasets": [
+                {"key": "dataset2", "name": config.DATASET_NAMES["dataset2"]},
+            ],
+            "models": SearchService.get_supported_models(),
+        }
+    )
 
 
 @app.route("/api/health", methods=["GET"])
@@ -250,6 +266,7 @@ def multilingual_translate():
         return jsonify({"error": "Text is empty"}), 400
     try:
         from services.query_refinement_service.refiner import detect_and_translate
+
         result = detect_and_translate(text)
         return jsonify(result)
     except Exception as e:
@@ -272,53 +289,73 @@ def clear_history():
 #  RAG
 @app.route("/api/rag", methods=["POST"])
 def rag_search():
-    data       = request.json
-    query      = data.get("query", "").strip()
-    dataset    = data.get("dataset", "dataset2")
+    data = request.json
+    query = data.get("query", "").strip()
+    dataset = data.get("dataset", "dataset2")
     model_type = data.get("model", "bm25")
-    history    = data.get("history", [])
+    history = data.get("history", [])
 
     if not query:
         return jsonify({"error": "Query is empty"}), 400
 
-    from services.query_refinement_service.refiner import detect_language, translate_to_english
+    from services.query_refinement_service.refiner import (
+        detect_language,
+        translate_to_english,
+    )
+
     lang = detect_language(query)
     search_query = translate_to_english(query) if lang == "ar" else query
     search_query = _expand_rag_search_query(search_query, history)
 
+    # === الخطوة 1: استرجاع مرشحين أوليين (recall) ===
     try:
         from services.search_service.searcher import SearchService
+
         search_result = SearchService.search_and_rank(
             query=search_query,
             dataset_key=dataset,
             model_type=model_type,
-            top_k_display=5,
+            top_k_display=8,  # نجيب مرشحين أكثر قبل التقطيع
         )
-        ranked = search_result["results"]
+        candidate_docs = search_result["results"]
     except Exception as e:
         return jsonify({"error": f"Retrieval failed: {str(e)}"}), 500
 
+    # === الخطوة 2: Chunking + Embedding + Vector Store (RAG الحقيقي) ===
+    from services.rag_service.chunk_retriever import build_chunk_index, search_chunks
+
+    chunk_index, chunks = build_chunk_index(candidate_docs, chunk_size=150, overlap=40)
+    ranked = search_chunks(search_query, chunk_index, chunks, top_k=5)
+
+    if not ranked:
+        # fallback احتياطي لو فشل التقطيع لأي سبب
+        ranked = candidate_docs[:5]
+
     _append_history(query)
 
+    # === الخطوة 3: التوليد بالـ LLM على الـ chunks المسترجعة ===
     from services.rag_service.rag import generate_answer
+
     rag_result = generate_answer(query, ranked, language=lang, history=history)
 
-    return jsonify({
-        "query":          query,
-        "search_query":   search_query,
-        "dataset":        dataset,
-        "model":          model_type,
-        "retrieved_docs": ranked,
-        "rag_answer":     rag_result.get("answer"),
-        "rag_success":    rag_result.get("success"),
-    })
+    return jsonify(
+        {
+            "query": query,
+            "search_query": search_query,
+            "dataset": dataset,
+            "model": model_type,
+            "retrieved_docs": ranked,
+            "rag_answer": rag_result.get("answer"),
+            "rag_success": rag_result.get("success"),
+        }
+    )
 
 
 #  TOPIC MODELING
 @app.route("/api/topics/run", methods=["POST"])
 def run_topics():
-    data            = request.json or {}
-    n_topics        = int(data.get("n_topics", 5))
+    data = request.json or {}
+    n_topics = int(data.get("n_topics", 5))
     force_recompute = data.get("force_recompute", False)
 
     if n_topics < 2 or n_topics > 20:
@@ -326,6 +363,7 @@ def run_topics():
 
     try:
         from services.analysis_service.topic_modeling import run_lda
+
         result = run_lda(
             n_topics=n_topics,
             force_recompute=force_recompute,
@@ -333,21 +371,24 @@ def run_topics():
         return jsonify(result)
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/topics/compare", methods=["POST"])
 def compare_topics():
-    data    = request.json or {}
+    data = request.json or {}
     n_range = data.get("n_range", [3, 5, 7, 10])
 
     try:
         from services.analysis_service.topic_modeling import compare_topic_counts
+
         result = compare_topic_counts(n_range=n_range)
         return jsonify(result)
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 

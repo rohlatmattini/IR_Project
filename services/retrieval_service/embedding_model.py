@@ -1,4 +1,3 @@
-
 import os
 import json
 import pickle
@@ -13,21 +12,33 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 import config
 
 
+
+_shared_sentence_model = None
+
+
+def get_shared_sentence_model(model_name: str = None) -> SentenceTransformer:
+    global _shared_sentence_model
+    model_name = model_name or config.EMBEDDING["model_name"]
+    if _shared_sentence_model is None:
+        print(f"[Embedding] 🔁 Loading shared model: {model_name}...")
+        _shared_sentence_model = SentenceTransformer(model_name)
+        print("[Embedding] ✅ Shared model is ready")
+    return _shared_sentence_model
+
+
 class EmbeddingModel:
 
     def __init__(self, model_name: str = None):
         self.model_name = model_name or config.EMBEDDING["model_name"]
         self.model = None
-        self.doc_embeddings = None  
+        self.doc_embeddings = None
         self.doc_ids = []
         self.is_fitted = False
-        self.faiss_index = None  
+        self.faiss_index = None
 
     def _load_model(self):
         if self.model is None:
-            print(f"[Embedding] Loading model: {self.model_name}...")
-            self.model = SentenceTransformer(self.model_name)
-            print("[Embedding] ✅ Model is ready")
+            self.model = get_shared_sentence_model(self.model_name)
 
     def fit(self, documents: list):
         if not documents:
@@ -68,7 +79,7 @@ class EmbeddingModel:
         print(f"[Embedding] 🔎 FAISS index built — {self.faiss_index.ntotal} vectors")
 
     def search(self, query: str, top_k: int = None) -> list:
-       
+
         if (
             not self.is_fitted
             or self.doc_embeddings is None
@@ -92,6 +103,7 @@ class EmbeddingModel:
             if idx != -1 and score > 0
         ]
         return results
+
     def get_query_embedding(self, query: str) -> np.ndarray:
         self._load_model()
         return self.model.encode([query], normalize_embeddings=True)[0]
@@ -119,11 +131,12 @@ class EmbeddingModel:
         self.doc_ids = data["doc_ids"]
         self.model_name = data["model_name"]
         self.is_fitted = True
-        self._build_faiss_index()  
+        self._build_faiss_index()
         print(f"[Embedding] 📂 Loaded from {path}")
 
+
 def load_documents_safely(docs_path: str) -> list:
-   
+
     with open(docs_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -171,6 +184,7 @@ def get_embedding_model(dataset_key: str) -> EmbeddingModel:
     model.fit(documents)
     model.save(model_path)
     return model
+
 
 if __name__ == "__main__":
     model = get_embedding_model("dataset2")
