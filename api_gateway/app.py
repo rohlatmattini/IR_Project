@@ -55,23 +55,27 @@ def _expand_rag_search_query(query: str, history: list) -> str:
 
     q = query.strip()
     q_lower = q.lower()
-    vague_markers = (
-        " it",
-        " it?",
-        " they",
-        " them",
-        " this",
-        " that",
-        " these",
-        " those",
+    word_count = len(q.split())
+
+    strong_markers = (
+        " what about",
+        " main arguments",
         " against it",
         " for it",
         " about it",
-        " main arguments",
-        " what about",
     )
-    is_short = len(q.split()) <= 12
-    is_vague = is_short and any(m in f" {q_lower}" for m in vague_markers)
+
+    weak_pronoun_markers = (
+        " it", " it?", " they", " them",
+        " this", " that", " these", " those",
+    )
+
+    is_short = word_count <= 12
+    is_vague = is_short and any(m in f" {q_lower}" for m in strong_markers)
+
+    if not is_vague and word_count <= 5:
+        is_vague = any(m in f" {q_lower}" for m in weak_pronoun_markers)
+
     if not is_vague:
         return q
 
@@ -84,7 +88,6 @@ def _expand_rag_search_query(query: str, history: list) -> str:
     if last_user:
         return f"{last_user} — {q}"
     return q
-
 
 #  STATIC
 _UI_FOLDER = os.path.join(os.path.dirname(__file__), "..", "ui")
